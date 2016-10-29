@@ -32,7 +32,7 @@ import net.conselldemallorca.helium.core.model.hibernate.ExpedientLog.ExpedientL
 import net.conselldemallorca.helium.core.model.hibernate.ExpedientTipus;
 import net.conselldemallorca.helium.core.model.hibernate.Registre;
 import net.conselldemallorca.helium.core.security.ExtendedPermission;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessDefinition;
 import net.conselldemallorca.helium.v3.core.api.dto.CampAgrupacioDto;
 import net.conselldemallorca.helium.v3.core.api.dto.CampDto;
@@ -65,7 +65,7 @@ public class ExpedientDadaServiceImpl implements ExpedientDadaService {
 	@Resource
 	private VariableHelper variableHelper;
 	@Resource
-	private JbpmHelper jbpmHelper;
+	private WorkflowEngineApi workflowEngineApi;
 	@Resource
 	private IndexHelper indexHelper;
 	@Resource
@@ -180,7 +180,7 @@ public class ExpedientDadaServiceImpl implements ExpedientDadaService {
 				processInstanceId,
 				ExpedientLogAccioTipus.PROCES_VARIABLE_ESBORRAR,
 				varCodi);
-		jbpmHelper.deleteProcessInstanceVariable(processInstanceId, varCodi);
+		workflowEngineApi.deleteProcessInstanceVariable(processInstanceId, varCodi);
 		indexHelper.expedientIndexLuceneUpdate(processInstanceId);
 		Registre registre = crearRegistreInstanciaProces(
 				expedientId,
@@ -318,7 +318,7 @@ public class ExpedientDadaServiceImpl implements ExpedientDadaService {
 			String processInstanceId,
 			String varName,
 			Object varValue) {
-		JbpmProcessDefinition jpd = jbpmHelper.findProcessDefinitionWithProcessInstanceId(processInstanceId);
+		JbpmProcessDefinition jpd = workflowEngineApi.findProcessDefinitionWithProcessInstanceId(processInstanceId);
 		DefinicioProces definicioProces = definicioProcesRepository.findByJbpmId(jpd.getId());
 		Camp camp;
 		if (expedientTipus.isAmbInfoPropia()) {
@@ -346,11 +346,11 @@ public class ExpedientDadaServiceImpl implements ExpedientDadaService {
 						text = "";
 					}
 					
-					jbpmHelper.setProcessInstanceVariable(processInstanceId, JbpmVars.PREFIX_VAR_DESCRIPCIO + varName, text);
+					workflowEngineApi.setProcessInstanceVariable(processInstanceId, JbpmVars.PREFIX_VAR_DESCRIPCIO + varName, text);
 				}
 			}
 		}
-		jbpmHelper.setProcessInstanceVariable(processInstanceId, varName, varValue);
+		workflowEngineApi.setProcessInstanceVariable(processInstanceId, varName, varValue);
 	}
 
 	private Registre crearRegistreInstanciaProces(

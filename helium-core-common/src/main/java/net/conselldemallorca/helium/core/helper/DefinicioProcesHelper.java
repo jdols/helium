@@ -37,7 +37,7 @@ import net.conselldemallorca.helium.core.model.hibernate.Tasca;
 import net.conselldemallorca.helium.core.model.hibernate.Tasca.TipusTasca;
 import net.conselldemallorca.helium.core.model.hibernate.Termini;
 import net.conselldemallorca.helium.core.model.hibernate.Validacio;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessDefinition;
 import net.conselldemallorca.helium.v3.core.api.dto.CampTipusDto;
 import net.conselldemallorca.helium.v3.core.api.dto.DefinicioProcesDto;
@@ -117,7 +117,7 @@ public class DefinicioProcesHelper {
 	@Resource
 	private MessageHelper messageHelper;
 	@Resource
-	private JbpmHelper jbpmHelper;
+	private WorkflowEngineApi workflowEngineApi;
 	@Resource
 	private EntornHelper entornHelper;
 	
@@ -180,7 +180,7 @@ public class DefinicioProcesHelper {
 									"exportar.validacio.definicio.desplegada.entorn", 
 									new Object[]{definicio.getJbpmKey()}));
 				}
-			JbpmProcessDefinition dpd = jbpmHelper.desplegar(
+			JbpmProcessDefinition dpd = workflowEngineApi.desplegar(
 					importacio.getNomDeploy(), 
 					importacio.getContingutDeploy());
 			if (dpd != null) {
@@ -193,14 +193,14 @@ public class DefinicioProcesHelper {
 				definicio.setExpedientTipus(expedientTipus);
 				definicio = definicioProcesRepository.saveAndFlush(definicio);
 				// Crea les tasques publicades
-				for (String nomTasca: jbpmHelper.getTaskNamesFromDeployedProcessDefinition(dpd)) {
+				for (String nomTasca: workflowEngineApi.getTaskNamesFromDeployedProcessDefinition(dpd)) {
 					Tasca tasca = new Tasca(
 							definicio,
 							nomTasca,
 							nomTasca,
 							TipusTasca.ESTAT);
 					String prefixRecursBo = "forms/" + nomTasca;
-					for (String resourceName: jbpmHelper.getResourceNames(dpd.getId())) {
+					for (String resourceName: workflowEngineApi.getResourceNames(dpd.getId())) {
 						if (resourceName.startsWith(prefixRecursBo)) {
 							tasca.setTipus(TipusTasca.FORM);
 							tasca.setRecursForm(nomTasca);
@@ -734,14 +734,14 @@ public class DefinicioProcesHelper {
 						definicio, 
 						DefinicioProcesDto.class));
 		exportacio.setNomDeploy("export.par");
-		Set<String> resourceNames = jbpmHelper.getResourceNames(definicio.getJbpmId());
+		Set<String> resourceNames = workflowEngineApi.getResourceNames(definicio.getJbpmId());
 		if (resourceNames != null && resourceNames.size() > 0) {
 			try {
 				ByteArrayOutputStream baos = new ByteArrayOutputStream();
 				ZipOutputStream zos = new ZipOutputStream(baos);
 				byte[] data = new byte[1024];
 				for (String resource: resourceNames) {
-					byte[] bytes = jbpmHelper.getResourceBytes(
+					byte[] bytes = workflowEngineApi.getResourceBytes(
 							definicio.getJbpmId(), 
 							resource);
 					if (bytes != null) {

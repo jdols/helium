@@ -18,7 +18,7 @@ import net.conselldemallorca.helium.core.helper.PermisosHelper.ObjectIdentifierE
 import net.conselldemallorca.helium.core.model.hibernate.Entorn;
 import net.conselldemallorca.helium.core.model.hibernate.ExpedientTipus;
 import net.conselldemallorca.helium.core.security.ExtendedPermission;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmTask;
 import net.conselldemallorca.helium.v3.core.api.exception.NoTrobatException;
 import net.conselldemallorca.helium.v3.core.api.exception.PermisDenegatException;
@@ -39,7 +39,7 @@ public class ExpedientTipusHelper {
 	private ExpedientRepository expedientRepository;
 
 	@Resource
-	private JbpmHelper jbpmHelper;
+	private WorkflowEngineApi workflowEngineApi;
 	@Resource(name = "permisosHelperV3")
 	private PermisosHelper permisosHelper;
 
@@ -221,13 +221,13 @@ public class ExpedientTipusHelper {
 	
 	public ExpedientTipus findAmbTaskId(
 			String taskId) {
-		JbpmTask task = jbpmHelper.getTaskById(taskId);
+		JbpmTask task = workflowEngineApi.getTaskById(taskId);
 		return findAmbProcessInstanceId(task.getProcessInstanceId());
 	}
 
 	public ExpedientTipus findAmbProcessInstanceId(
 			String processInstanceId) {
-		ProcessInstanceExpedient piexp = jbpmHelper.expedientFindByProcessInstanceId(processInstanceId);
+		ProcessInstanceExpedient piexp = workflowEngineApi.expedientFindByProcessInstanceId(processInstanceId);
 		return expedientTipusRepository.findOne(piexp.getTipus().getId());
 	}
 

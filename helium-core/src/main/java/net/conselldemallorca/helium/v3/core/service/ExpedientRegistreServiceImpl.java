@@ -31,7 +31,7 @@ import net.conselldemallorca.helium.core.model.hibernate.ExpedientLog;
 import net.conselldemallorca.helium.core.model.hibernate.ExpedientLog.ExpedientLogAccioTipus;
 import net.conselldemallorca.helium.core.model.hibernate.ExpedientLog.ExpedientLogEstat;
 import net.conselldemallorca.helium.core.security.ExtendedPermission;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmTask;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmToken;
 import net.conselldemallorca.helium.v3.core.api.dto.ExpedientLogDto;
@@ -57,7 +57,7 @@ public class ExpedientRegistreServiceImpl implements ExpedientRegistreService {
 	@Resource
 	private ExpedientHelper expedientHelper;
 	@Resource
-	private JbpmHelper jbpmHelper;
+	private WorkflowEngineApi workflowEngineApi;
 	@Resource
 	private TascaHelper tascaHelper;
 	@Resource
@@ -149,7 +149,7 @@ public class ExpedientRegistreServiceImpl implements ExpedientRegistreService {
 		Map<String, ExpedientTascaDto> tasquesPerLogs = new HashMap<String, ExpedientTascaDto>();
 		for (ExpedientLog log: logs) {
 			if (log.isTargetTasca()) {
-				JbpmTask task = jbpmHelper.getTaskById(log.getTargetId());
+				JbpmTask task = workflowEngineApi.getTaskById(log.getTargetId());
 				if (task != null) {
 					tasquesPerLogs.put(
 							log.getTargetId(),
@@ -211,7 +211,7 @@ public class ExpedientRegistreServiceImpl implements ExpedientRegistreService {
 				new Permission[] {
 						ExtendedPermission.LOG_MANAGE,
 						ExtendedPermission.ADMINISTRATION});
-		jbpmHelper.deleteProcessInstanceTreeLogs(expedient.getProcessInstanceId());
+		workflowEngineApi.deleteProcessInstanceTreeLogs(expedient.getProcessInstanceId());
 	}
 
 	/**

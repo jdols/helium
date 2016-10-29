@@ -69,9 +69,9 @@ import net.conselldemallorca.helium.core.model.hibernate.Registre;
 import net.conselldemallorca.helium.core.model.hibernate.Tasca;
 import net.conselldemallorca.helium.core.model.hibernate.TerminiIniciat;
 import net.conselldemallorca.helium.core.security.ExtendedPermission;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.integracio.DelegationInfo;
 import net.conselldemallorca.helium.jbpm3.integracio.ExecucioHandlerException;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessInstance;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmTask;
 import net.conselldemallorca.helium.jbpm3.integracio.LlistatIds;
@@ -151,7 +151,7 @@ public class TascaServiceImpl implements TascaService {
 	@Resource
 	private EntornHelper entornHelper;
 	@Resource
-	private JbpmHelper jbpmHelper;
+	private WorkflowEngineApi workflowEngineApi;
 	@Resource
 	private ExpedientTipusHelper expedientTipusHelper;
 	@Resource
@@ -323,7 +323,7 @@ public class TascaServiceImpl implements TascaService {
 					expedient,
 					null);
 			
-			LlistatIds ids = jbpmHelper.findListTasks(
+			LlistatIds ids = workflowEngineApi.findListTasks(
 					responsable,
 					titol,
 					tasca,
@@ -440,7 +440,7 @@ public class TascaServiceImpl implements TascaService {
 			}
 			boolean mostrarAssignadesUsuari = (nomesTasquesPersonals && !nomesTasquesGrup) || (!nomesTasquesPersonals && !nomesTasquesGrup);
 			boolean mostrarAssignadesGrup = (nomesTasquesGrup && !nomesTasquesPersonals) || (!nomesTasquesPersonals && !nomesTasquesGrup);
-			ResultatConsultaPaginadaJbpm<JbpmTask> paginaTasks = jbpmHelper.tascaFindByFiltrePaginat(
+			ResultatConsultaPaginadaJbpm<JbpmTask> paginaTasks = workflowEngineApi.tascaFindByFiltrePaginat(
 					entornId,
 					responsable,
 					tasca,
@@ -457,7 +457,8 @@ public class TascaServiceImpl implements TascaService {
 					mostrarAssignadesUsuari,
 					mostrarAssignadesGrup,
 					true,
-					paginacioParams);
+					paginacioParams,
+					false);
 			return paginacioHelper.toPaginaDto(
 					paginaTasks.getLlista(),
 					paginaTasks.getCount(),
@@ -498,7 +499,7 @@ public class TascaServiceImpl implements TascaService {
 
 		List<ExpedientTascaDto> expedientTasques = new ArrayList<ExpedientTascaDto>();
 		for (Long id : ids) {
-			JbpmTask task = jbpmHelper.getTaskById(String.valueOf(id));
+			JbpmTask task = workflowEngineApi.getTaskById(String.valueOf(id));
 			expedientTasques.add(tascaHelper.toExpedientTascaDto(
 					task,
 					null,
@@ -757,7 +758,7 @@ public class TascaServiceImpl implements TascaService {
 				id,
 				ExpedientLogAccioTipus.TASCA_REASSIGNAR,
 				previousActors);
-		jbpmHelper.takeTaskInstance(id, auth.getName());
+		workflowEngineApi.takeTaskInstance(id, auth.getName());
 		indexHelper.expedientIndexLuceneUpdate(task.getProcessInstanceId());
 		String currentActors = expedientLoggerHelper.getActorsPerReassignacioTasca(id);
 		expedientLog.setAccioParams(previousActors + "::" + currentActors);
@@ -792,7 +793,7 @@ public class TascaServiceImpl implements TascaService {
 				id,
 				ExpedientLogAccioTipus.TASCA_REASSIGNAR,
 				previousActors);
-		jbpmHelper.releaseTaskInstance(id);
+		workflowEngineApi.releaseTaskInstance(id);
 		indexHelper.expedientIndexLuceneUpdate(task.getProcessInstanceId());
 		String currentActors = expedientLoggerHelper.getActorsPerReassignacioTasca(id);
 		expedientLog.setAccioParams(previousActors + "::" + currentActors);
@@ -884,7 +885,7 @@ public class TascaServiceImpl implements TascaService {
 			String arxiuNom,
 			byte[] arxiuContingut,
 			String user) {
-		JbpmTask task = jbpmHelper.getTaskById(taskInstanceId);
+		JbpmTask task = workflowEngineApi.getTaskById(taskInstanceId);
 		DocumentStore documentStore = documentHelper.getDocumentStore(task, documentCodi);
 		Expedient expedient = expedientHelper.findExpedientByProcessInstanceId(task.getProcessInstanceId());
 		boolean creat = (documentStore == null);
@@ -960,8 +961,8 @@ public class TascaServiceImpl implements TascaService {
 				task.getProcessDefinitionId());
 		Map<String, Object> variablesProcessades = new HashMap<String, Object>(variables);
 		tascaHelper.processarCampsAmbDominiCacheActivat(task, tasca, variablesProcessades);
-		jbpmHelper.startTaskInstance(taskId);
-		jbpmHelper.setTaskInstanceVariables(taskId, variablesProcessades, false);	
+		workflowEngineApi.startTaskInstance(taskId);
+		workflowEngineApi.setTaskInstanceVariables(taskId, variablesProcessades, false);	
 		
 		if (task.getStartTime() == null) {
 			Registre registre = new Registre(
@@ -1002,8 +1003,8 @@ public class TascaServiceImpl implements TascaService {
 				task.getTaskName(),
 				task.getProcessDefinitionId());
 		tascaHelper.processarCampsAmbDominiCacheActivat(task, tasca, variables);
-		jbpmHelper.startTaskInstance(tascaId);
-		jbpmHelper.setTaskInstanceVariables(tascaId, variables, false);
+		workflowEngineApi.startTaskInstance(tascaId);
+		workflowEngineApi.setTaskInstanceVariables(tascaId, variables, false);
 		tascaHelper.validarTasca(tascaId);
 		
 		Registre registre = new Registre(
@@ -1115,7 +1116,7 @@ public class TascaServiceImpl implements TascaService {
 		if (tasca.isFinalitzacioSegonPla()) {
 			//cridar command per a marcar la tasca per a finalitzar en segón pla
 			Date marcadaFinalitzar = new Date();
-			jbpmHelper.marcarFinalitzar(tascaId, marcadaFinalitzar, outcome);
+			workflowEngineApi.marcarFinalitzar(tascaId, marcadaFinalitzar, outcome);
 			checkFinalitzarSegonPla(tascaId, marcadaFinalitzar);
 			
 			expedientLoggerHelper.afegirLogExpedientPerTasca(
@@ -1210,7 +1211,7 @@ public class TascaServiceImpl implements TascaService {
 			JbpmTask task,
 			String outcome,
 			String usuari) {
-		ProcessInstanceExpedient piexp = jbpmHelper.expedientFindByProcessInstanceId(
+		ProcessInstanceExpedient piexp = workflowEngineApi.expedientFindByProcessInstanceId(
 				task.getProcessInstanceId());
 		Expedient expedient = expedientRepository.findOne(piexp.getId());
 
@@ -1259,19 +1260,19 @@ public class TascaServiceImpl implements TascaService {
 					ExpedientLogAccioTipus.TASCA_COMPLETAR,
 					outcome,
 					usuari);
-			jbpmHelper.startTaskInstance(tascaId);
-			jbpmHelper.endTaskInstance(tascaId, outcome);
+			workflowEngineApi.startTaskInstance(tascaId);
+			workflowEngineApi.endTaskInstance(tascaId, outcome);
 			checkCompletarTasca(tascaId);
 			// Accions per a una tasca delegada
 			DelegationInfo delegationInfo = tascaHelper.getDelegationInfo(task);
 			if (delegationInfo != null) {
 				if (!tascaId.equals(delegationInfo.getSourceTaskId())) {
 					// Copia les variables de la tasca delegada a la original
-					jbpmHelper.setTaskInstanceVariables(
+					workflowEngineApi.setTaskInstanceVariables(
 							delegationInfo.getSourceTaskId(),
-							jbpmHelper.getTaskInstanceVariables(tascaId),
+							workflowEngineApi.getTaskInstanceVariables(tascaId),
 							false);
-					JbpmTask taskOriginal = jbpmHelper.getTaskById(
+					JbpmTask taskOriginal = workflowEngineApi.getTaskById(
 							delegationInfo.getSourceTaskId());
 					if (!delegationInfo.isSupervised()) {
 						// Si no es supervisada també finalitza la tasca original
@@ -1281,7 +1282,7 @@ public class TascaServiceImpl implements TascaService {
 				}
 			}
 			
-			JbpmProcessInstance pi = jbpmHelper.getRootProcessInstance(expedientLog.getExpedient().getProcessInstanceId());		
+			JbpmProcessInstance pi = workflowEngineApi.getRootProcessInstance(expedientLog.getExpedient().getProcessInstanceId());		
 			actualitzarTerminisIAlertes(tascaId, expedientLog.getExpedient());
 			verificarFinalitzacioExpedient(expedientLog.getExpedient(), pi);
 			indexHelper.expedientIndexLuceneUpdate(expedientLog.getExpedient().getProcessInstanceId());
@@ -1358,7 +1359,7 @@ public class TascaServiceImpl implements TascaService {
 				ExpedientLogAccioTipus.TASCA_ACCIO_EXECUTAR,
 				accio,
 				usuari);
-		jbpmHelper.executeActionInstanciaTasca(tascaId, accio);
+		workflowEngineApi.executeActionInstanciaTasca(tascaId, accio);
 		indexHelper.expedientIndexLuceneUpdate(task.getProcessInstanceId());
 	}
 
@@ -1458,7 +1459,7 @@ public class TascaServiceImpl implements TascaService {
 	public void carregaTasquesSegonPla() {
 		if (!tascaSegonPlaHelper.isTasquesSegonPlaLoaded()) {
 			//Primer carregam les ids de les tasques pendents d'executar en segon pla
-			List<Object[]> tasquesSegonPlaIds = jbpmHelper.getTasquesSegonPlaPendents();
+			List<Object[]> tasquesSegonPlaIds = workflowEngineApi.getTasquesSegonPlaPendents();
 			tascaSegonPlaHelper.loadTasquesSegonPla();
 			if(tasquesSegonPlaIds.size() > 0) {
 				for(Object[] taskResult: tasquesSegonPlaIds) {
@@ -1471,7 +1472,7 @@ public class TascaServiceImpl implements TascaService {
 	@Override
 	@Transactional
 	public void completaTascaSegonPla(String tascaId, Date iniciFinalitzacio) {
-        JbpmTask task = jbpmHelper.getTaskById(tascaId);
+        JbpmTask task = workflowEngineApi.getTaskById(tascaId);
        
         Authentication orgAuth = SecurityContextHolder.getContext().getAuthentication();
         if (orgAuth == null) {
@@ -1488,7 +1489,7 @@ public class TascaServiceImpl implements TascaService {
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }
        
-        jbpmHelper.marcarIniciFinalitzacioSegonPla(tascaId, iniciFinalitzacio);
+        workflowEngineApi.marcarIniciFinalitzacioSegonPla(tascaId, iniciFinalitzacio);
        
         completarTasca(
                 tascaId,
@@ -1503,7 +1504,7 @@ public class TascaServiceImpl implements TascaService {
 	@Override
 	@Transactional
 	public void guardarErrorFinalitzacio(String tascaId, String errorFinalitzacio) {
-		jbpmHelper.guardarErrorFinalitzacio(tascaId, errorFinalitzacio);
+		workflowEngineApi.guardarErrorFinalitzacio(tascaId, errorFinalitzacio);
 	}
 	
 	@Override
@@ -1514,11 +1515,11 @@ public class TascaServiceImpl implements TascaService {
 			String codiVariable,
 			Object valor) {
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-		JbpmTask task = jbpmHelper.getTaskById(taskId);
+		JbpmTask task = workflowEngineApi.getTaskById(taskId);
 		Object valorVell = variableHelper.getVariableJbpmTascaValor(task.getId(), codiVariable);
 		Map<String, Object> variables = new HashMap<String, Object>();
 		variables.put(codiVariable, valor);
-		jbpmHelper.setTaskInstanceVariables(task.getId(), variables, false);
+		workflowEngineApi.setTaskInstanceVariables(task.getId(), variables, false);
 		
 		Registre registre = new Registre(
 				new Date(),
@@ -1598,7 +1599,7 @@ public class TascaServiceImpl implements TascaService {
 		if (definicioProcesId == null && definicioProces == null) {
 			logger.error("No s'ha trobat la definició de procés (entorn=" + expedientTipus.getEntorn().getCodi() + ", jbpmKey=" + expedientTipus.getJbpmProcessDefinitionKey() + ")");
 		}
-		String starTaskName = jbpmHelper.getStartTaskName(definicioProces.getJbpmId());
+		String starTaskName = workflowEngineApi.getStartTaskName(definicioProces.getJbpmId());
 		Tasca tasca = tascaRepository.findByJbpmNameAndDefinicioProces(starTaskName, definicioProces);
 		FormulariExternDto dto = formulariExternHelper.iniciar(
 				tascaIniciId,
@@ -1620,7 +1621,7 @@ public class TascaServiceImpl implements TascaService {
 					terminiIniciat.setDataCancelacio(new Date());
 					long[] timerIds = terminiIniciat.getTimerIdsArray();
 					for (int i = 0; i < timerIds.length; i++)
-						jbpmHelper.suspendTimer(
+						workflowEngineApi.suspendTimer(
 								timerIds[i],
 								new Date(Long.MAX_VALUE));
 				}
@@ -1637,7 +1638,7 @@ public class TascaServiceImpl implements TascaService {
 			terminiIniciat.setDataCompletat(new Date());
 			esborrarAlertesAntigues(terminiIniciat);
 			if (terminiIniciat.getTermini().isAlertaCompletat()) {
-				JbpmTask task = jbpmHelper.getTaskById(taskId);
+				JbpmTask task = workflowEngineApi.getTaskById(taskId);
 				if (task.getAssignee() != null) {
 					crearAlertaCompletat(terminiIniciat, task.getAssignee(), expedient);
 				} else {

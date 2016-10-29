@@ -34,7 +34,6 @@ import net.conselldemallorca.helium.core.model.hibernate.Portasignatures;
 import net.conselldemallorca.helium.core.model.hibernate.Portasignatures.TipusEstat;
 import net.conselldemallorca.helium.core.model.hibernate.Portasignatures.Transicio;
 import net.conselldemallorca.helium.core.security.ExtendedPermission;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmTask;
 import net.conselldemallorca.helium.v3.core.api.dto.ArxiuDto;
 import net.conselldemallorca.helium.v3.core.api.dto.DocumentDto;
@@ -77,8 +76,6 @@ public class ExpedientDocumentServiceImpl implements ExpedientDocumentService {
 	private DocumentHelperV3 documentHelper;
 	@Resource
 	private TascaHelper tascaHelper;
-	@Resource
-	private JbpmHelper jbpmHelper;
 	@Resource
 	private IndexHelper indexHelper;
 	@Resource

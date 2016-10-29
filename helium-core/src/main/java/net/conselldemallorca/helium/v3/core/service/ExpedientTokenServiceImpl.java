@@ -12,25 +12,25 @@ import java.util.Map;
 
 import javax.annotation.Resource;
 
-import net.conselldemallorca.helium.core.helper.ConversioTipusHelper;
-import net.conselldemallorca.helium.core.helper.ExpedientHelper;
-import net.conselldemallorca.helium.core.model.hibernate.Expedient;
-import net.conselldemallorca.helium.core.model.hibernate.Registre;
-import net.conselldemallorca.helium.core.security.ExtendedPermission;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmToken;
-import net.conselldemallorca.helium.v3.core.api.dto.TokenDto;
-import net.conselldemallorca.helium.v3.core.api.exception.NoTrobatException;
-import net.conselldemallorca.helium.v3.core.api.service.ExpedientTokenService;
-import net.conselldemallorca.helium.v3.core.repository.ExpedientRepository;
-import net.conselldemallorca.helium.v3.core.repository.RegistreRepository;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.acls.model.Permission;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import net.conselldemallorca.helium.core.helper.ConversioTipusHelper;
+import net.conselldemallorca.helium.core.helper.ExpedientHelper;
+import net.conselldemallorca.helium.core.model.hibernate.Expedient;
+import net.conselldemallorca.helium.core.model.hibernate.Registre;
+import net.conselldemallorca.helium.core.security.ExtendedPermission;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
+import net.conselldemallorca.helium.jbpm3.integracio.JbpmToken;
+import net.conselldemallorca.helium.v3.core.api.dto.TokenDto;
+import net.conselldemallorca.helium.v3.core.api.exception.NoTrobatException;
+import net.conselldemallorca.helium.v3.core.api.service.ExpedientTokenService;
+import net.conselldemallorca.helium.v3.core.repository.ExpedientRepository;
+import net.conselldemallorca.helium.v3.core.repository.RegistreRepository;
 
 /**
  * Servei per gestionar els tokens dels expedients.
@@ -46,7 +46,7 @@ public class ExpedientTokenServiceImpl implements ExpedientTokenService {
 	private RegistreRepository registreRepository;
 
 	@Resource
-	private JbpmHelper jbpmHelper;
+	private WorkflowEngineApi workflowEngineApi;
 	@Resource
 	private ConversioTipusHelper conversioTipusHelper;
 	@Resource
@@ -72,7 +72,7 @@ public class ExpedientTokenServiceImpl implements ExpedientTokenService {
 						ExtendedPermission.TOKEN_READ,
 						ExtendedPermission.ADMINISTRATION});
 		if (expedient != null){
-			Map<String, JbpmToken> tokens = jbpmHelper.getAllTokens(processInstanceId);
+			Map<String, JbpmToken> tokens = workflowEngineApi.getAllTokens(processInstanceId);
 			for (String tokenName: tokens.keySet()) {
 				jbpmTokens.add(tokens.get(tokenName));
 			}
@@ -109,7 +109,7 @@ public class ExpedientTokenServiceImpl implements ExpedientTokenService {
 						ExtendedPermission.TOKEN_MANAGE,
 						ExtendedPermission.ADMINISTRATION});
 		if( expedient!= null)
-			return jbpmHelper.tokenActivar(tokenId, activar);
+			return workflowEngineApi.tokenActivar(tokenId, activar);
 		else
 			return false;
 	}
@@ -133,7 +133,7 @@ public class ExpedientTokenServiceImpl implements ExpedientTokenService {
 						ExtendedPermission.TOKEN_MANAGE,
 						ExtendedPermission.ADMINISTRATION});
 		if( expedient!= null)
-			return jbpmHelper.findArrivingNodeNames(tokenId);
+			return workflowEngineApi.findArrivingNodeNames(tokenId);
 		else
 			return null;
 	}
@@ -157,7 +157,7 @@ public class ExpedientTokenServiceImpl implements ExpedientTokenService {
 						ExtendedPermission.TOKEN_MANAGE,
 						ExtendedPermission.ADMINISTRATION});
 		if( expedient != null)
-			return conversioTipusHelper.convertir(jbpmHelper.getTokenById(tokenId), TokenDto.class);
+			return conversioTipusHelper.convertir(workflowEngineApi.getTokenById(tokenId), TokenDto.class);
 		else
 			return null;
 	}
@@ -185,12 +185,12 @@ public class ExpedientTokenServiceImpl implements ExpedientTokenService {
 						ExtendedPermission.TOKEN_MANAGE,
 						ExtendedPermission.ADMINISTRATION});
 		if( expedient != null){
-			JbpmToken token = jbpmHelper.getTokenById(tokenId);
+			JbpmToken token = workflowEngineApi.getTokenById(tokenId);
 			if (token == null)
 				throw new NoTrobatException(JbpmToken.class, tokenId);
 			
 			String nodeNameVell = token.getNodeName();
-			jbpmHelper.tokenRedirect(new Long(tokenId).longValue(), nodeName, cancelTasks, true, false);
+			workflowEngineApi.tokenRedirect(new Long(tokenId).longValue(), nodeName, cancelTasks, true, false);
 			
 			crearRegistreRetrocedirToken(
 					expedientId,

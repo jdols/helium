@@ -38,7 +38,7 @@ import net.conselldemallorca.helium.core.model.hibernate.Expedient;
 import net.conselldemallorca.helium.core.model.hibernate.ExpedientLog.ExpedientLogAccioTipus;
 import net.conselldemallorca.helium.core.util.GlobalProperties;
 import net.conselldemallorca.helium.core.util.OpenOfficeUtils;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessInstance;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmTask;
 
@@ -57,7 +57,7 @@ public class DocumentService {
 	private PlantillaDocumentDao plantillaDocumentDao;
 	private DocumentStoreDao documentStoreDao;
 	private RegistreDao registreDao;
-	private JbpmHelper jbpmDao;
+	private WorkflowEngineApi workflowEngineApi;
 	private DtoConverter dtoConverter;
 	private DocumentHelper documentHelper;
 	private ExpedientLogHelper expedientLogHelper;
@@ -83,13 +83,13 @@ public class DocumentService {
 			String arxiuNom,
 			byte[] arxiuContingut,
 			String user) {
-		JbpmTask task = jbpmDao.getTaskById(taskInstanceId);
+		JbpmTask task = workflowEngineApi.getTaskById(taskInstanceId);
 		DocumentStore documentStore = documentHelper.getDocumentStore(
 				taskInstanceId,
 				task.getProcessInstanceId(),
 				documentCodi);
 		Expedient expedient = expedientDao.findAmbProcessInstanceId(
-				jbpmDao.getRootProcessInstance(task.getProcessInstanceId()).getId());
+				workflowEngineApi.getRootProcessInstance(task.getProcessInstanceId()).getId());
 		boolean creat = (documentStore == null);
 		
 		if (creat) {
@@ -166,7 +166,7 @@ public class DocumentService {
 				processInstanceId,
 				documentCodi);
 		Expedient expedient = expedientDao.findAmbProcessInstanceId(
-				jbpmDao.getRootProcessInstance(processInstanceId).getId());
+				workflowEngineApi.getRootProcessInstance(processInstanceId).getId());
 		boolean creat = (documentStore == null);
 		
 		if (!isAdjunt) {
@@ -283,11 +283,11 @@ public class DocumentService {
 			String user) {
 		String piid = processInstanceId;
 		if (piid == null && taskInstanceId != null) {
-			JbpmTask task = jbpmDao.getTaskById(taskInstanceId);
+			JbpmTask task = workflowEngineApi.getTaskById(taskInstanceId);
 			piid = task.getProcessInstanceId();
 		}
 		Expedient expedient = expedientDao.findAmbProcessInstanceId(
-				jbpmDao.getRootProcessInstance(piid).getId());
+				workflowEngineApi.getRootProcessInstance(piid).getId());
 		
 		if (taskInstanceId != null) {
 			expedientLogHelper.afegirLogExpedientPerTasca(
@@ -328,7 +328,7 @@ public class DocumentService {
 			String adjuntId,
 			String adjuntTitol) {
 		Expedient expedient = expedientDao.findAmbProcessInstanceId(
-				jbpmDao.getRootProcessInstance(processInstanceId).getId());
+				workflowEngineApi.getRootProcessInstance(processInstanceId).getId());
 		
 		expedientLogHelper.afegirLogExpedientPerProces(
 				processInstanceId,
@@ -421,7 +421,7 @@ public class DocumentService {
 		boolean signat = documentHelper.signarDocumentTascaAmbToken(token, signatura);
 		if (signat) {
 			DocumentDto dto = documentHelper.getDocumentOriginalPerToken(token, false);
-			JbpmProcessInstance rootProcessInstance = jbpmDao.getRootProcessInstance(dto.getProcessInstanceId());
+			JbpmProcessInstance rootProcessInstance = workflowEngineApi.getRootProcessInstance(dto.getProcessInstanceId());
 			Expedient expedient = expedientDao.findAmbProcessInstanceId(rootProcessInstance.getId());
 			registreDao.crearRegistreSignarDocument(
 					expedient.getId(),
@@ -488,8 +488,8 @@ public class DocumentService {
 			Map<String, Object> model = new HashMap<String, Object>();
 			String responsableCodi;
 			if (taskInstanceId != null) {
-				JbpmTask task = jbpmDao.getTaskById(taskInstanceId);
-				JbpmProcessInstance rootProcessInstance = jbpmDao.getRootProcessInstance(task.getProcessInstanceId());
+				JbpmTask task = workflowEngineApi.getTaskById(taskInstanceId);
+				JbpmProcessInstance rootProcessInstance = workflowEngineApi.getRootProcessInstance(task.getProcessInstanceId());
 				expedient = dtoConverter.toExpedientDto(
 						expedientDao.findAmbProcessInstanceId(rootProcessInstance.getId()),
 						false);
@@ -520,7 +520,7 @@ public class DocumentService {
 				model.putAll(tasca.getVarsComText());
 				responsableCodi = task.getAssignee();
 			} else {
-				JbpmProcessInstance rootProcessInstance = jbpmDao.getRootProcessInstance(processInstanceId);
+				JbpmProcessInstance rootProcessInstance = workflowEngineApi.getRootProcessInstance(processInstanceId);
 				expedient = dtoConverter.toExpedientDto(
 						expedientDao.findAmbProcessInstanceId(rootProcessInstance.getId()),
 						false);
@@ -583,7 +583,7 @@ public class DocumentService {
 			String taskInstanceId,
 			String documentCodi,
 			String extensio) {
-		JbpmTask task = jbpmDao.getTaskById(taskInstanceId);
+		JbpmTask task = workflowEngineApi.getTaskById(taskInstanceId);
 		DefinicioProces definicioProces = definicioProcesDao.findAmbJbpmId(
 				task.getProcessDefinitionId());
 		Document document = documentDao.findAmbDefinicioProcesICodi(
@@ -628,8 +628,8 @@ public class DocumentService {
 		this.registreDao = registreDao;
 	}
 	@Autowired
-	public void setJbpmHelper(JbpmHelper jbpmDao) {
-		this.jbpmDao = jbpmDao;
+	public void setWorkflowEngineApi(WorkflowEngineApi workflowEngineApi) {
+		this.workflowEngineApi = workflowEngineApi;
 	}
 	@Autowired
 	public void setDtoConverter(DtoConverter dtoConverter) {

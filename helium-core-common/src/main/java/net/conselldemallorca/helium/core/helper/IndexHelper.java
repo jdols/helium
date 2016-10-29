@@ -26,8 +26,8 @@ import net.conselldemallorca.helium.core.model.hibernate.CampRegistre;
 import net.conselldemallorca.helium.core.model.hibernate.DefinicioProces;
 import net.conselldemallorca.helium.core.model.hibernate.Expedient;
 import net.conselldemallorca.helium.core.model.hibernate.ExpedientTipus;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.integracio.DominiCodiDescripcio;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessInstance;
 import net.conselldemallorca.helium.jbpm3.integracio.Registre;
 import net.conselldemallorca.helium.v3.core.api.exception.IndexacioException;
@@ -59,7 +59,7 @@ public class IndexHelper {
 //	@Resource
 //	private MongoDBHelper mongoDBHelper;
 	@Resource
-	private JbpmHelper jbpmHelper;
+	private WorkflowEngineApi workflowEngineApi;
 	@Resource
 	private MetricRegistry metricRegistry;
 
@@ -174,7 +174,7 @@ public class IndexHelper {
 			boolean perTasca,
 			Expedient expedientDeLaTasca) {
 		
-		JbpmProcessInstance rootProcessInstance = jbpmHelper.getRootProcessInstance(processInstanceId);
+		JbpmProcessInstance rootProcessInstance = workflowEngineApi.getRootProcessInstance(processInstanceId);
 		Expedient expedient = expedientHelper.findExpedientByProcessInstanceId(rootProcessInstance.getId());
 		
 		Timer.Context contextTotal = null;
@@ -441,7 +441,7 @@ public class IndexHelper {
 
 	private Map<String, Object> getVariablesJbpmProcesValor(
 			String processInstanceId) {
-		Map<String, Object> valors = jbpmHelper.getProcessInstanceVariables(processInstanceId);
+		Map<String, Object> valors = workflowEngineApi.getProcessInstanceVariables(processInstanceId);
 		Map<String, Object> valorsRevisats = new HashMap<String, Object>();
 		if (valors != null) {
 			for (String varCodi: valors.keySet()) {
@@ -454,7 +454,7 @@ public class IndexHelper {
 
 	private boolean isExpedientFinalitzat(Expedient expedient) {
 		if (expedient.getProcessInstanceId() != null) {
-			JbpmProcessInstance processInstance = jbpmHelper.getProcessInstance(expedient.getProcessInstanceId());
+			JbpmProcessInstance processInstance = workflowEngineApi.getProcessInstance(expedient.getProcessInstanceId());
 			return processInstance.getEnd() != null;
 		}
 		return false;
@@ -462,7 +462,7 @@ public class IndexHelper {
 
 	private Map<String, DefinicioProces> getMapDefinicionsProces(String processInstanceId) {
 		Map<String, DefinicioProces> resposta = new HashMap<String, DefinicioProces>();
-		List<JbpmProcessInstance> tree = jbpmHelper.getProcessInstanceTree(processInstanceId);
+		List<JbpmProcessInstance> tree = workflowEngineApi.getProcessInstanceTree(processInstanceId);
 		for (JbpmProcessInstance pi: tree)
 			resposta.put(
 					pi.getId(),
@@ -472,7 +472,7 @@ public class IndexHelper {
 	
 	private Map<String, Set<Camp>> getMapCamps(String processInstanceId) {
 		Map<String, Set<Camp>> resposta = new HashMap<String, Set<Camp>>();
-		List<JbpmProcessInstance> tree = jbpmHelper.getProcessInstanceTree(processInstanceId);
+		List<JbpmProcessInstance> tree = workflowEngineApi.getProcessInstanceTree(processInstanceId);
 		Set<Camp> camps;
 		ExpedientTipus expedientTipus;
 		for (JbpmProcessInstance pi: tree) {
@@ -492,7 +492,7 @@ public class IndexHelper {
 	
 	private Map<String, Map<String, Object>> getMapValors(String processInstanceId) {
 		Map<String, Map<String, Object>> resposta = new HashMap<String, Map<String, Object>>();
-		List<JbpmProcessInstance> tree = jbpmHelper.getProcessInstanceTree(processInstanceId);
+		List<JbpmProcessInstance> tree = workflowEngineApi.getProcessInstanceTree(processInstanceId);
 		for (JbpmProcessInstance pi: tree)
 			resposta.put(
 					pi.getId(),

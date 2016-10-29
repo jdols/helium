@@ -29,7 +29,7 @@ import net.conselldemallorca.helium.core.model.hibernate.Enumeracio;
 import net.conselldemallorca.helium.core.model.hibernate.FirmaTasca;
 import net.conselldemallorca.helium.core.model.hibernate.Tasca;
 import net.conselldemallorca.helium.core.model.hibernate.Termini;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.v3.core.api.dto.CampDto;
 import net.conselldemallorca.helium.v3.core.api.dto.CampTascaDto;
 import net.conselldemallorca.helium.v3.core.api.dto.ConsultaDto;
@@ -107,11 +107,11 @@ public class DefinicioProcesServiceImpl implements DefinicioProcesService {
 	@Resource
 	private EntornHelper entornHelper;
 	@Resource
-	private JbpmHelper jbpmHelper;
-	@Resource
 	private ConversioTipusHelper conversioTipusHelper;
 	@Resource
 	private PaginacioHelper paginacioHelper;
+	@Resource
+	private WorkflowEngineApi workflowEngineApi;
 
 	/**
 	 * {@inheritDoc}
@@ -327,8 +327,7 @@ public class DefinicioProcesServiceImpl implements DefinicioProcesService {
 				entornId,
 				true);
 		DefinicioProces definicioProces = definicioProcesRepository.findById(definicioProcesId);
-		jbpmHelper.esborrarDesplegament(
-				definicioProces.getJbpmId());
+		workflowEngineApi.esborrarDesplegament(definicioProces.getJbpmId());
 		definicioProcesRepository.delete(definicioProces);
 	}
 

@@ -74,9 +74,9 @@ import net.conselldemallorca.helium.core.model.hibernate.Registre;
 import net.conselldemallorca.helium.core.model.hibernate.Termini;
 import net.conselldemallorca.helium.core.model.hibernate.TerminiIniciat;
 import net.conselldemallorca.helium.core.security.ExtendedPermission;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.handlers.exception.ValidationException;
 import net.conselldemallorca.helium.jbpm3.integracio.ExecucioHandlerException;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessInstance;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmTask;
 import net.conselldemallorca.helium.jbpm3.integracio.ResultatConsultaPaginadaJbpm;
@@ -191,7 +191,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 	@Resource
 	private ExpedientTipusHelper expedientTipusHelper;
 	@Resource
-	private JbpmHelper jbpmHelper;
+	private WorkflowEngineApi workflowEngineApi;
 	@Resource
 	private VariableHelper variableHelper;
 	@Resource(name="documentHelperV3")
@@ -414,7 +414,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 						expedientTipus.getJbpmProcessDefinitionKey());
 			}
 			//MesurarTemps.diferenciaImprimirStdoutIReiniciar(mesuraTempsIncrementalPrefix, "7");
-			JbpmProcessInstance processInstance = jbpmHelper.startProcessInstanceById(
+			JbpmProcessInstance processInstance = workflowEngineApi.startProcessInstanceById(
 					usuariBo,
 					definicioProces.getJbpmId(),
 					variables);
@@ -477,7 +477,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 			mesuresTemporalsHelper.mesuraIniciar("Iniciar", "expedient", expedientTipus.getNom(), null, "Iniciar flux");
 			
 			// Actualitza les variables del procés
-			jbpmHelper.signalProcessInstance(expedient.getProcessInstanceId(), transitionName);
+			workflowEngineApi.signalProcessInstance(expedient.getProcessInstanceId(), transitionName);
 
 			mesuresTemporalsHelper.mesuraCalcular("Iniciar", "expedient", expedientTipus.getNom(), null, "Iniciar flux");
 			mesuresTemporalsHelper.mesuraIniciar("Iniciar", "expedient", expedientTipus.getNom(), null, "Indexar expedient");
@@ -628,12 +628,12 @@ public class ExpedientServiceImpl implements ExpedientService {
 				true,
 				false);
 		
-		List<JbpmProcessInstance> processInstancesTree = jbpmHelper.getProcessInstanceTree(expedient.getProcessInstanceId());
+		List<JbpmProcessInstance> processInstancesTree = workflowEngineApi.getProcessInstanceTree(expedient.getProcessInstanceId());
 		for (JbpmProcessInstance pi: processInstancesTree){
 			for (TerminiIniciat ti: terminiIniciatRepository.findByProcessInstanceId(pi.getId()))
 				terminiIniciatRepository.delete(ti);
 			
-			jbpmHelper.deleteProcessInstance(pi.getId());
+			workflowEngineApi.deleteProcessInstance(pi.getId());
 			
 			for (DocumentStore documentStore: documentStoreRepository.findByProcessInstanceId(pi.getId())) {
 				if (documentStore.isSignat()) {
@@ -800,7 +800,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 		// Obté la llista de tipus d'expedient permesos
 		List<Long> tipusPermesosIds = expedientTipusHelper.findIdsAmbPermisRead(entorn);
 		// Executa la consulta amb paginació
-		ResultatConsultaPaginadaJbpm<Long> expedientsIds = jbpmHelper.expedientFindByFiltre(
+		ResultatConsultaPaginadaJbpm<Long> expedientsIds = workflowEngineApi.expedientFindByFiltre(
 				entornId,
 				auth.getName(),
 				tipusPermesosIds,
@@ -920,7 +920,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 		// Obté la llista de tipus d'expedient permesos
 		List<Long> tipusPermesosIds = expedientTipusHelper.findIdsAmbPermisRead(entorn);
 		// Executa la consulta amb paginació
-		ResultatConsultaPaginadaJbpm<Long> expedientsIds = jbpmHelper.expedientFindByFiltre(
+		ResultatConsultaPaginadaJbpm<Long> expedientsIds = workflowEngineApi.expedientFindByFiltre(
 				entornId,
 				auth.getName(),
 				tipusPermesosIds,
@@ -1007,7 +1007,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 		ArxiuDto imatge = new ArxiuDto();
 		imatge.setNom(resourceName);
 		imatge.setContingut(
-				jbpmHelper.getResourceBytes(
+				workflowEngineApi.getResourceBytes(
 						definicioProces.getJbpmId(),
 						resourceName));
 		return imatge;
@@ -1074,7 +1074,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 						ExtendedPermission.ADMINISTRATION},
 					auth);
 		List<ExpedientTascaDto> resposta = new ArrayList<ExpedientTascaDto>();
-		for (JbpmProcessInstance jpi: jbpmHelper.getProcessInstanceTree(expedient.getProcessInstanceId())) {
+		for (JbpmProcessInstance jpi: workflowEngineApi.getProcessInstanceTree(expedient.getProcessInstanceId())) {
 			resposta.addAll(
 					tascaHelper.findTasquesPerExpedientPerInstanciaProces(
 							jpi.getId(),
@@ -1114,9 +1114,9 @@ public class ExpedientServiceImpl implements ExpedientService {
 					expedient.getProcessInstanceId(),
 					SecurityContextHolder.getContext().getAuthentication().getName(),
 					getVarNameFromDocumentStore(documentStore));
-			List<JbpmTask> tasks = jbpmHelper.findTaskInstancesForProcessInstance(expedient.getProcessInstanceId());
+			List<JbpmTask> tasks = workflowEngineApi.findTaskInstancesForProcessInstance(expedient.getProcessInstanceId());
 			for (JbpmTask task: tasks) {
-				jbpmHelper.deleteTaskInstanceVariable(
+				workflowEngineApi.deleteTaskInstanceVariable(
 						task.getId(),
 						jbpmVariable);
 			}
@@ -1181,12 +1181,12 @@ public class ExpedientServiceImpl implements ExpedientService {
 				"Anular",
 				"expedient",
 				expedient.getTipus().getNom());
-		List<JbpmProcessInstance> processInstancesTree = jbpmHelper.getProcessInstanceTree(expedient.getProcessInstanceId());
+		List<JbpmProcessInstance> processInstancesTree = workflowEngineApi.getProcessInstanceTree(expedient.getProcessInstanceId());
 		String[] ids = new String[processInstancesTree.size()];
 		int i = 0;
 		for (JbpmProcessInstance pi: processInstancesTree)
 			ids[i++] = pi.getId();
-		jbpmHelper.suspendProcessInstances(ids);
+		workflowEngineApi.suspendProcessInstances(ids);
 		expedient.setAnulat(true);
 		expedient.setComentariAnulat(motiu);
 		luceneHelper.deleteExpedient(expedient);
@@ -1218,13 +1218,13 @@ public class ExpedientServiceImpl implements ExpedientService {
 				null);
 		expedientLog.setEstat(ExpedientLogEstat.IGNORAR);
 		logger.debug("Reprenent les instàncies de procés associades a l'expedient (id=" + id + ")");
-		List<JbpmProcessInstance> processInstancesTree = jbpmHelper.getProcessInstanceTree(
+		List<JbpmProcessInstance> processInstancesTree = workflowEngineApi.getProcessInstanceTree(
 				expedient.getProcessInstanceId());
 		String[] ids = new String[processInstancesTree.size()];
 		int i = 0;
 		for (JbpmProcessInstance pi: processInstancesTree)
 			ids[i++] = pi.getId();
-		jbpmHelper.resumeProcessInstances(ids);
+		workflowEngineApi.resumeProcessInstances(ids);
 		expedient.setAnulat(false);
 	}
 
@@ -1246,7 +1246,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 				null);
 		expedientLog.setEstat(ExpedientLogEstat.IGNORAR);
 		logger.debug("Desfer finalització de l'expedient (id=" + id + ")");
-		jbpmHelper.desfinalitzarExpedient(expedient.getProcessInstanceId());
+		workflowEngineApi.desfinalitzarExpedient(expedient.getProcessInstanceId());
 		expedient.setDataFi(null);
 		expedientRegistreHelper.crearRegistreReprendreExpedient(
 				expedient.getId(),
@@ -1365,7 +1365,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 		if (MesuresTemporalsHelper.isActiu()) {
 			mesuresTemporalsHelper.mesuraIniciar("Executar SCRIPT", "expedient", expedient.getTipus().getNom());
 		}
-		jbpmHelper.evaluateScript(processInstanceId, script, new HashSet<String>());
+		workflowEngineApi.evaluateScript(processInstanceId, script, new HashSet<String>());
 		verificarFinalitzacioExpedient(expedient, processInstanceId);
 		indexHelper.expedientIndexLuceneUpdate(processInstanceId);
 		expedientLoggerHelper.afegirLogExpedientPerProces(
@@ -1387,7 +1387,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 		logger.debug("Canviant versió de la definició de procés (" +
 				"processInstanceId=" + processInstanceId + ", " +
 				"versio=" + versio + ")");
-		ProcessInstanceExpedient piexp = jbpmHelper.expedientFindByProcessInstanceId(processInstanceId);
+		ProcessInstanceExpedient piexp = workflowEngineApi.expedientFindByProcessInstanceId(processInstanceId);
 		expedientHelper.getExpedientComprovantPermisos(
 				piexp.getId(),
 				new Permission[] {
@@ -1396,7 +1396,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 		DefinicioProces defprocAntiga = expedientHelper.findDefinicioProcesByProcessInstanceId(processInstanceId);
 		if (defprocAntiga == null)
 			throw new NoTrobatException(DefinicioProces.class, processInstanceId);
-		jbpmHelper.changeProcessInstanceVersion(processInstanceId, versio);
+		workflowEngineApi.changeProcessInstanceVersion(processInstanceId, versio);
 		// Apunta els terminis iniciats cap als terminis
 		// de la nova definició de procés
 		DefinicioProces defprocNova = expedientHelper.findDefinicioProcesByProcessInstanceId(processInstanceId);
@@ -1423,25 +1423,25 @@ public class ExpedientServiceImpl implements ExpedientService {
 						ExtendedPermission.DEFPROC_UPDATE,
 						ExtendedPermission.ADMINISTRATION});
 		if (!expedient.isAmbRetroaccio()) {
-			jbpmHelper.deleteProcessInstanceTreeLogs(expedient.getProcessInstanceId());
+			workflowEngineApi.deleteProcessInstanceTreeLogs(expedient.getProcessInstanceId());
 		}
 		if (definicioProcesId != null) {
 			DefinicioProces defprocAntiga = expedientHelper.findDefinicioProcesByProcessInstanceId(expedient.getProcessInstanceId());
 			DefinicioProces defprocNova = definicioProcesRepository.findById(definicioProcesId);
 			if (!defprocAntiga.equals(defprocNova)) {
-				jbpmHelper.changeProcessInstanceVersion(expedient.getProcessInstanceId(), defprocNova.getVersio());
+				workflowEngineApi.changeProcessInstanceVersion(expedient.getProcessInstanceId(), defprocNova.getVersio());
 				updateTerminis(expedient.getProcessInstanceId(), defprocAntiga, defprocNova);
 			}
 		}
 		// Subprocessos
 		if (subProcesIds != null && subProcesIds.length > 0) {
 			// Arriben amb el mateix ordre??
-			List<JbpmProcessInstance> instanciesProces = jbpmHelper.getProcessInstanceTree(expedient.getProcessInstanceId());
+			List<JbpmProcessInstance> instanciesProces = workflowEngineApi.getProcessInstanceTree(expedient.getProcessInstanceId());
 			for (JbpmProcessInstance instanciaProces: instanciesProces) {
 				DefinicioProces defprocAntiga = expedientHelper.findDefinicioProcesByProcessInstanceId(instanciaProces.getId());
 				int versio = findVersioDefProcesActualitzar(subDefinicioProces, subProcesIds, instanciaProces.getProcessInstance().getProcessDefinition().getName());
 				if (versio != -1 && versio != defprocAntiga.getVersio()) {
-					jbpmHelper.changeProcessInstanceVersion(instanciaProces.getId(), versio);
+					workflowEngineApi.changeProcessInstanceVersion(instanciaProces.getId(), versio);
 					DefinicioProces defprocNova =  expedientHelper.findDefinicioProcesByProcessInstanceId(instanciaProces.getId());
 					updateTerminis(instanciaProces.getId(), defprocAntiga, defprocNova);
 				}
@@ -1547,7 +1547,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 					ExpedientLogAccioTipus.EXPEDIENT_ACCIO,
 					accio.getJbpmAction());
 			try {
-				jbpmHelper.executeActionInstanciaProces(
+				workflowEngineApi.executeActionInstanciaProces(
 						processInstanceId,
 						accio.getJbpmAction());
 			} catch (Exception ex) {
@@ -1799,7 +1799,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 	public InstanciaProcesDto getInstanciaProcesById(String processInstanceId) {
 		InstanciaProcesDto dto = new InstanciaProcesDto();
 		dto.setId(processInstanceId);
-		JbpmProcessInstance pi = jbpmHelper.getProcessInstance(processInstanceId);
+		JbpmProcessInstance pi = workflowEngineApi.getProcessInstance(processInstanceId);
 		if (pi.getProcessInstance() == null)
 			return null;
 		dto.setInstanciaProcesPareId(pi.getParentProcessInstanceId());
@@ -2092,7 +2092,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 		if (definicioProcesId == null && definicioProces == null) {
 			logger.error("No s'ha trobat la definició de procés (entorn=" + entornId + ", jbpmKey=" + expedientTipus.getJbpmProcessDefinitionKey() + ")");
 		}
-		String startTaskName = jbpmHelper.getStartTaskName(definicioProces.getJbpmId());
+		String startTaskName = workflowEngineApi.getStartTaskName(definicioProces.getJbpmId());
 		if (startTaskName != null) {
 			return tascaHelper.toTascaInicialDto(startTaskName, definicioProces.getJbpmId(), valors);
 		}
@@ -2157,7 +2157,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 		} else {
 			List<Long> tipusPermesosIds = expedientTipusHelper.findIdsAmbPermisRead(entorn);
 			Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-			ResultatConsultaPaginadaJbpm<Long> expedientsIds = jbpmHelper.expedientFindByFiltre(
+			ResultatConsultaPaginadaJbpm<Long> expedientsIds = workflowEngineApi.expedientFindByFiltre(
 					entorn.getId(),
 					auth.getName(),
 					tipusPermesosIds,
@@ -2295,7 +2295,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 		// Obte la llista d'expedients permesos segons els filtres
 		List<Long> tipusPermesosIds = expedientTipusHelper.findIdsAmbPermisRead(entorn);
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-		ResultatConsultaPaginadaJbpm<Long> expedientsIds = jbpmHelper.expedientFindByFiltre(
+		ResultatConsultaPaginadaJbpm<Long> expedientsIds = workflowEngineApi.expedientFindByFiltre(
 				entorn.getId(),
 				auth.getName(),
 				tipusPermesosIds,
@@ -2459,7 +2459,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 	private void verificarFinalitzacioExpedient(
 			Expedient expedient,
 			String processInstanceId) {
-		JbpmProcessInstance pi = jbpmHelper.getRootProcessInstance(processInstanceId);
+		JbpmProcessInstance pi = workflowEngineApi.getRootProcessInstance(processInstanceId);
 		if (pi.getEnd() != null) {
 			// Actualitzar data de fi de l'expedient
 			expedient.setDataFi(pi.getEnd());
@@ -2469,7 +2469,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 					terminiIniciat.setDataCancelacio(new Date());
 					long[] timerIds = terminiIniciat.getTimerIdsArray();
 					for (int i = 0; i < timerIds.length; i++)
-						jbpmHelper.suspendTimer(
+						workflowEngineApi.suspendTimer(
 								timerIds[i],
 								new Date(Long.MAX_VALUE));
 				}
@@ -2595,7 +2595,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 			idsPI.add((String) id[1]);
 		}
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-		List<String> ids = jbpmHelper.findRootProcessInstancesWithTasksCommand(
+		List<String> ids = workflowEngineApi.findRootProcessInstancesWithTasksCommand(
 						auth.getName(),
 						idsPI,
 						nomesMeves,
@@ -2625,7 +2625,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 			", jbpmKey = " + jbpmKey + ")");
 		List<String> processInstancesIds = new ArrayList<String>();
 		for (JbpmProcessInstance processInstance : 
-			jbpmHelper.findProcessInstancesWithProcessDefinitionNameAndEntorn(
+			workflowEngineApi.findProcessInstancesWithProcessDefinitionNameAndEntorn(
 					jbpmKey, 
 					entornId))
 			processInstancesIds.add(processInstance.getId());
@@ -2642,7 +2642,7 @@ public class ExpedientServiceImpl implements ExpedientService {
 			"definicioProcesId = " + definicioProcesId + ")");
 		DefinicioProces definicioProces = definicioProcesRepository.findById(definicioProcesId);
 		List<String> processInstancesIds = new ArrayList<String>();
-		for (JbpmProcessInstance processInstance : jbpmHelper.findProcessInstancesWithProcessDefinitionId(definicioProces.getJbpmId()))
+		for (JbpmProcessInstance processInstance : workflowEngineApi.findProcessInstancesWithProcessDefinitionId(definicioProces.getJbpmId()))
 			processInstancesIds.add(processInstance.getId());
 		return processInstancesIds;
 	}

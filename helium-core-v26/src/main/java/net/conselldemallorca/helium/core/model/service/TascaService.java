@@ -65,10 +65,10 @@ import net.conselldemallorca.helium.core.model.hibernate.FormulariExtern;
 import net.conselldemallorca.helium.core.model.hibernate.Tasca;
 import net.conselldemallorca.helium.core.model.hibernate.TerminiIniciat;
 import net.conselldemallorca.helium.core.security.AclServiceDao;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi.MostrarTasquesDto;
 import net.conselldemallorca.helium.jbpm3.integracio.DelegationInfo;
 import net.conselldemallorca.helium.jbpm3.integracio.DominiCodiDescripcio;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper.MostrarTasquesDto;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessInstance;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmTask;
 import net.conselldemallorca.helium.jbpm3.integracio.ResultatConsultaPaginadaJbpm;
@@ -98,7 +98,7 @@ public class TascaService {
 	private ExpedientTipusDao expedientTipusDao;
 	private TascaDao tascaDao;
 	private DefinicioProcesDao definicioProcesDao;
-	private JbpmHelper jbpmDao;
+	private WorkflowEngineApi workflowEngineApi;
 	private AclServiceDao aclServiceDao;
 	private DtoConverter dtoConverter;
 	private PluginPersonaDao pluginPersonaDao;
@@ -144,11 +144,11 @@ public class TascaService {
 		return getByIdSenseComprovacio(taskId, usuari, null);
 	}
 	public TascaDto getByIdSenseComprovacio(String taskId, String usuari, Map<String, Object> valorsCommand) {
-		JbpmTask task = jbpmDao.getTaskById(taskId);
+		JbpmTask task = workflowEngineApi.getTaskById(taskId);
 		return toTascaDto(task, valorsCommand, true, true);
 	}
 	public TascaDto getByIdSenseComprovacioIDades(String taskId) {
-		JbpmTask task = jbpmDao.getTaskById(taskId);
+		JbpmTask task = workflowEngineApi.getTaskById(taskId);
 		return toTascaDto(task, null, false, false);
 	}
 
@@ -196,22 +196,6 @@ public class TascaService {
 		List<TascaLlistatDto> tasques = resposta.getLlistat();
 		mesuresTemporalsHelper.mesuraCalcular("Obtenir tasques personals", "consulta");
 		return tasques;
-		/*String usuariBo = usuari;
-		if (usuariBo == null) {
-			Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-			usuariBo = auth.getName();
-		}
-		List<JbpmTask> tasques = null;
-		if (codiExpedient == null) {
-			tasques = jbpmDao.findPersonalTasks(usuariBo);
-		} else {
-			List<Long> ids = expedientDao.findPIExpedientsAmbEntornTipusINum(entornId, codiExpedient);
-			LlistatIds llistatIds = jbpmDao.findListIdsPersonalTasks(usuari,ids);
-			tasques = jbpmDao.findPersonalTasks(llistatIds.getIds(), usuari);
-		}
-		List<TascaLlistatDto> list = tasquesFiltradesPerEntorn(entornId, tasques, perTramitacio);
-		mesuresTemporalsHelper.mesuraCalcular("Obtenir tasques personals", "consulta");
-		return list;*/
 	}
 
 	@Timed
@@ -229,7 +213,7 @@ public class TascaService {
 		PaginacioParamsDto paginacioParams = new PaginacioParamsDto();
 		paginacioParams.setPaginaNum(0);
 		paginacioParams.setPaginaTamany(-1);
-		ResultatConsultaPaginadaJbpm<JbpmTask> tasks = jbpmDao.tascaFindByFiltrePaginat(
+		ResultatConsultaPaginadaJbpm<JbpmTask> tasks = workflowEngineApi.tascaFindByFiltrePaginat(
 				entornId,
 				usuariBo,
 				null,
@@ -248,13 +232,6 @@ public class TascaService {
 				true, // nomesPendents
 				paginacioParams,
 				true);
-		/*List<Long> idsExpedients = getExpedientIdsPerConsultaTasques(
-				entornId, 
-				usuariBo, null, null, null, null, false);
-		LlistatIds lista = jbpmDao.findListIdsPersonalTasks(
-				usuariBo,
-				idsExpedients);
-		count = lista.getCount();*/
 		mesuresTemporalsHelper.mesuraCalcular(
 				"Recompte tasques personals",
 				"consulta");
@@ -286,7 +263,7 @@ public class TascaService {
 		PaginacioParamsDto paginacioParams = new PaginacioParamsDto();
 		paginacioParams.setPaginaNum(0);
 		paginacioParams.setPaginaTamany(-1);
-		ResultatConsultaPaginadaJbpm<JbpmTask> tasks = jbpmDao.tascaFindByFiltrePaginat(
+		ResultatConsultaPaginadaJbpm<JbpmTask> tasks = workflowEngineApi.tascaFindByFiltrePaginat(
 				entornId,
 				usuariBo,
 				null,
@@ -305,23 +282,6 @@ public class TascaService {
 				true, // nomesPendents
 				paginacioParams,
 				true);
-		/*List<Long> idsExpedients = getExpedientIdsPerConsultaTasques(
-				entornId, 
-				usuariBo,
-				expedientTitol, 
-				expedientNumero,
-				expedientTipusId,
-				sort,
-				asc);
-		LlistatIds ids = jbpmDao.findListPersonalTasks(
-				usuariBo, 
-				titol, 
-				idsExpedients, 
-				dataCreacioInici, 
-				dataCreacioFi, 
-				prioritat, 
-				dataLimitInici, 
-				dataLimitFi, firstRow, maxResults, sort, asc);*/
 		mesuresTemporalsHelper.mesuraCalcular("CONSULTA TASQUES COUNT PERSONA", "consulta");
 		return tasks.getCount();
 	}
@@ -371,93 +331,6 @@ public class TascaService {
 				false, 	// incloureTasquesGrup
 				true, 	// nomesPendents
 				false);	// ambPersones
-			/*
-			final Timer timerExpedientIds = metricRegistry.timer(
-					MetricRegistry.name(
-							TascaService.class,
-							"findTasquesPersonalsFiltre",
-							entornId.toString(),
-							"1_expedientIds"));
-			final Timer timerTascaIds = metricRegistry.timer(
-					MetricRegistry.name(
-							TascaService.class,
-							"findTasquesPersonalsFiltre",
-							entornId.toString(),
-							"2_tascaIds"));
-			final Timer timerTasques = metricRegistry.timer(
-					MetricRegistry.name(
-							TascaService.class,
-							"findTasquesPersonalsFiltre",
-							entornId.toString(),
-							"3_tasques"));
-			final Timer timerResposta = metricRegistry.timer(
-					MetricRegistry.name(
-							TascaService.class,
-							"findTasquesPersonalsFiltre",
-							entornId.toString(),
-							"4_resposta"));
-			final Timer.Context contextExpedientIds = timerExpedientIds.time();
-			List<Long> expedientIds;
-			try {
-				// Consulta els expedients de l'entorn que compleixen el filtre
-				expedientIds = expedientDao.findListExpedients(
-						entornId,
-						null,
-						usuariBo,
-						expedient, 
-						numeroExpedient,
-						tipusExpedient,
-						sort,
-						asc);
-			} finally {
-				contextExpedientIds.stop();
-			}
-			final Timer.Context contextTascaIds = timerTascaIds.time();
-			LlistatIds tascaIds;
-			try {
-				// Consulta els expedients de l'entorn que compleixen el filtre
-				tascaIds = jbpmDao.findListPersonalTasks(
-						usuariBo,
-						tasca,
-						expedientIds,
-						dataCreacioInici,
-						dataCreacioFi,
-						prioritat,
-						dataLimitInici,
-						dataLimitFi, firstRow, maxResults, sort, asc);
-			} finally {
-				contextTascaIds.stop();
-			}
-			final Timer.Context contextTasques = timerTasques.time();
-			List<JbpmTask> tasques;
-			try {
-				tasques = jbpmDao.findPersonalTasks(
-						tascaIds.getIds(),
-						usuariBo);
-			} finally {
-				contextTasques.stop();
-			}
-			final Timer.Context contextResposta = timerResposta.time();
-			try {
-				resposta = tasquesLlistatFiltradesValors(
-						entornId,
-						tasques, 
-						tasca,
-						expedient,
-						tipusExpedient,
-						dataCreacioInici,
-						dataCreacioFi,
-						prioritat,
-						dataLimitInici,
-						dataLimitFi,
-						0,
-						maxResults,
-						sort,
-						asc);
-				resposta.setCount(tascaIds.getCount());
-			} finally {
-				contextResposta.stop();
-			}*/
 		mesuresTemporalsHelper.mesuraCalcular("CONSULTA TASQUES PERSONA", "consulta");
 		return resposta;
 	}
@@ -476,7 +349,7 @@ public class TascaService {
 		PaginacioParamsDto paginacioParams = new PaginacioParamsDto();
 		paginacioParams.setPaginaNum(0);
 		paginacioParams.setPaginaTamany(-1);
-		ResultatConsultaPaginadaJbpm<JbpmTask> tasks = jbpmDao.tascaFindByFiltrePaginat(
+		ResultatConsultaPaginadaJbpm<JbpmTask> tasks = workflowEngineApi.tascaFindByFiltrePaginat(
 				entornId,
 				usuariBo,
 				null,
@@ -495,14 +368,6 @@ public class TascaService {
 				true, // nomesPendents
 				paginacioParams,
 				true);
-		/*List<Long> idsExpedients = getExpedientIdsPerConsultaTasques(
-				entornId, 
-				usuariBo, null, null, null, null, false);*/
-		/*List<Long> idsExpedients = expedientDao.findListExpedients(
-				entornId, 
-				usuariBo, null, null, null, null, false);*/
-		/*LlistatIds lista = jbpmDao.findListIdsGroupTasks(usuariBo, idsExpedients);
-		count = lista.getCount();*/
 		mesuresTemporalsHelper.mesuraCalcular("Recompte tasques grup", "consulta");
 		return tasks.getCount();
 	}
@@ -532,7 +397,7 @@ public class TascaService {
 		PaginacioParamsDto paginacioParams = new PaginacioParamsDto();
 		paginacioParams.setPaginaNum(0);
 		paginacioParams.setPaginaTamany(-1);
-		ResultatConsultaPaginadaJbpm<JbpmTask> tasks = jbpmDao.tascaFindByFiltrePaginat(
+		ResultatConsultaPaginadaJbpm<JbpmTask> tasks = workflowEngineApi.tascaFindByFiltrePaginat(
 				entornId,
 				usuariBo,
 				null,
@@ -551,31 +416,6 @@ public class TascaService {
 				true, // nomesPendents
 				paginacioParams,
 				true);
-		/*List<Long> idsExpedients = getExpedientIdsPerConsultaTasques(
-				entornId, 
-				usuariBo,
-				expedient, 
-				numeroExpedient,
-				tipusExpedient,
-				sort,
-				asc);*/
-		/*List<Long> idsExpedients = expedientDao.findListExpedients(
-				entornId, 
-				usuariBo,
-				expedient, 
-				numeroExpedient,
-				tipusExpedient,
-				sort,
-				asc);*/
-		/*int count = jbpmDao.findListGroupTasks(
-				usuariBo, 
-				tasca, 
-				idsExpedients, 
-				dataCreacioInici, 
-				dataCreacioFi, 
-				prioritat, 
-				dataLimitInici, 
-				dataLimitFi, firstRow, maxResults, sort, asc).getCount();*/
 		mesuresTemporalsHelper.mesuraCalcular("CONSULTA TASQUES GRUP COUNT", "consulta");
 		return tasks.getCount();
 	}
@@ -626,104 +466,6 @@ public class TascaService {
 				true, 	// incloureTasquesGrup
 				true, 	// nomesPendents
 				false);	// ambPersones
-		/*PaginaLlistatDto resposta;
-		final Timer timerTotal = metricRegistry.timer(
-				MetricRegistry.name(
-						TascaService.class,
-						"findTasquesGrupFiltre",
-						entornId.toString()));
-		final Timer.Context contextTotal = timerTotal.time();
-		try {
-			mesuresTemporalsHelper.mesuraIniciar("CONSULTA TASQUES GRUP", "consulta");
-			String usuariBo = usuari;
-			if (usuariBo == null) {
-				Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-				usuariBo = auth.getName();
-			}
-			final Timer timerExpedientIds = metricRegistry.timer(
-					MetricRegistry.name(
-							TascaService.class,
-							"findTasquesGrupFiltre",
-							entornId.toString(),
-							"1_expedientIds"));
-			final Timer timerTascaIds = metricRegistry.timer(
-					MetricRegistry.name(
-							TascaService.class,
-							"findTasquesGrupFiltre",
-							entornId.toString(),
-							"2_tascaIds"));
-			final Timer timerTasques = metricRegistry.timer(
-					MetricRegistry.name(
-							TascaService.class,
-							"findTasquesGrupFiltre",
-							entornId.toString(),
-							"3_tasques"));
-			final Timer timerResposta = metricRegistry.timer(
-					MetricRegistry.name(
-							TascaService.class,
-							"findTasquesGrupFiltre",
-							entornId.toString(),
-							"4_resposta"));
-			final Timer.Context contextExpedientIds = timerExpedientIds.time();
-			List<Long> expedientIds;
-			try {
-				expedientIds = getExpedientIdsPerConsultaTasques(
-						entornId,
-						usuariBo,
-						expedient, 
-						numeroExpedient,
-						tipusExpedient,
-						sort,
-						asc);
-			} finally {
-				contextExpedientIds.stop();
-			}
-			final Timer.Context contextTascaIds = timerTascaIds.time();
-			LlistatIds tascaIds;
-			try {
-				tascaIds = jbpmDao.findListGroupTasks(
-						usuariBo, 
-						tasca, 
-						expedientIds, 
-						dataCreacioInici, 
-						dataCreacioFi, 
-						prioritat, 
-						dataLimitInici, 
-						dataLimitFi, firstRow, maxResults, sort, asc);
-			} finally {
-				contextTascaIds.stop();
-			}
-			final Timer.Context contextTasques = timerTasques.time();
-			List<JbpmTask> tasques;
-			try {
-				tasques = jbpmDao.findGroupTasks(
-						tascaIds.getIds(),
-						usuariBo);
-			} finally {
-				contextTasques.stop();
-			}
-			final Timer.Context contextResposta = timerResposta.time();
-			try {
-				resposta = tasquesLlistatFiltradesValors(
-						entornId,
-						tasques, 
-						tasca,
-						expedient,
-						tipusExpedient,
-						dataCreacioInici,
-						dataCreacioFi,
-						prioritat,
-						dataLimitInici,
-						dataLimitFi,
-						0,
-						maxResults,
-						sort,
-						asc);	
-				resposta.setCount(tascaIds.getCount());
-			} finally {
-				contextResposta.stop();
-			}
-			mesuresTemporalsHelper.mesuraCalcular("CONSULTA TASQUES GRUP", "consulta");*/
 		mesuresTemporalsHelper.mesuraCalcular("CONSULTA TASQUES GRUP", "consulta");
 		return resposta;
 	}
@@ -766,47 +508,6 @@ public class TascaService {
 				incloureTasquesGrup,
 				true, 	// nomesPendents
 				true);	// ambPersones
-		/*List<Long> idsExpedients = getExpedientIdsPerConsultaTasques(
-				entornId,
-				responsable,
-				titol, 
-				null,
-				expedientTipusId,
-				sort,
-				asc);
-		LlistatIds ids = jbpmDao.findListTasks(
-				responsable, 
-				jbpmName, 
-				null,
-				idsExpedients, 
-				dataCreacioInici, 
-				dataCreacioFi, 
-				null, 
-				null, 
-				null, 
-				firstRow, 
-				maxResults, 
-				sort, 
-				asc,
-				mostrarTasques);
-		List<JbpmTask> tasques = jbpmDao.findGroupTasks(ids.getIds(), responsable);
-		PaginaLlistatDto resposta = tasquesLlistatFiltradesValors(
-				entornId,
-				tasques, 
-				null,
-				null,
-				tipusExpedient,
-				dataCreacioInici,
-				dataCreacioFi,
-				null,
-				null,
-				null,
-				0,
-				maxResults,
-				sort,
-				asc,
-				true);	
-		resposta.setCount(ids.getCount());*/
 		mesuresTemporalsHelper.mesuraCalcular("CONSULTA TASQUES LLISTAT", "consulta");
 		return resposta;
 	}
@@ -820,7 +521,7 @@ public class TascaService {
 			Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 			usuariBo = auth.getName();
 		}
-		List<JbpmTask> tasques = jbpmDao.findPersonalTasks(usuariBo);
+		List<JbpmTask> tasques = workflowEngineApi.findPersonalTasks(usuariBo);
 		JbpmTask task = comprovarSeguretatTasca(entornId, taskId, usuari, true);
 		TascaDto tasca = toTascaDto(task, null, true, true);
 		String codi = task.getTaskName();
@@ -853,7 +554,7 @@ public class TascaService {
 			PaginacioParamsDto paginacioParams = new PaginacioParamsDto();
 			paginacioParams.setPaginaNum(0);
 			paginacioParams.setPaginaTamany(-1);
-			ResultatConsultaPaginadaJbpm<JbpmTask> tasks = jbpmDao.tascaFindByFiltrePaginat(
+			ResultatConsultaPaginadaJbpm<JbpmTask> tasks = workflowEngineApi.tascaFindByFiltrePaginat(
 					entornId,
 					usuariBo,
 					null,
@@ -870,7 +571,8 @@ public class TascaService {
 					false, // tasquesPersona
 					true, // tasquesGrup
 					true, // nomesPendents
-					paginacioParams);
+					paginacioParams,
+					false);
 			for (JbpmTask task: tasks.getLlista()) {
 				if (task.getId().equals(tascaId)) {
 					res = true;
@@ -878,26 +580,6 @@ public class TascaService {
 				}
 			}
 		} catch (NumberFormatException ignored) {}
-		/*if (usuari == null) {
-			Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-			usuari = auth.getName();
-		}
-		List<Long> idsExpedients = getExpedientIdsPerConsultaTasques(
-				entornId,
-				usuari, null, null, null, null, false);
-		LlistatIds llistatIds = jbpmDao.findListIdsGroupTasks(usuari, idsExpedients);
-		if (llistatIds.getIds().contains(Long.valueOf(tascaId))) {
-			res = true;
-		} else {
-			List<Long> lista = jbpmDao.findIdsRootProcessInstanceGroupTasks(llistatIds.getIds(), usuari);
-			for (Long pid : lista) {
-				Expedient expedient = expedientDao.findAmbProcessInstanceId(String.valueOf(pid));
-				if (expedient != null && idsExpedients.contains(expedient.getId())) {
-					res = true;
-					break;
-				}
-			}
-		}*/
 		mesuresTemporalsHelper.mesuraCalcular("is tasques grup", "consulta");
 		return res;
 	}
@@ -940,26 +622,10 @@ public class TascaService {
 		List<TascaLlistatDto> tasques = resposta.getLlistat();
 		mesuresTemporalsHelper.mesuraCalcular("Obtenir tasques grup", "consulta");
 		return tasques;
-		/*String usuariBo = usuari;
-		if (usuariBo == null) {
-			Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-			usuariBo = auth.getName();
-		}
-		List<JbpmTask> tasques = new ArrayList<JbpmTask>();
-		if (codiExpedient == null) {
-			tasques = jbpmDao.findGroupTasks(usuariBo);
-		} else {
-			List<Long> ids = expedientDao.findPIExpedientsAmbEntornTipusINum(entornId, codiExpedient);
-			LlistatIds llistatIds = jbpmDao.findListIdsGroupTasks(usuari,ids);
-			tasques = jbpmDao.findGroupTasks(llistatIds.getIds(), usuari);
-		}
-		List<TascaLlistatDto> list = tasquesFiltradesPerEntorn(entornId, tasques, perTramitacio);
-		mesuresTemporalsHelper.mesuraCalcular("Obtenir tasques grup", "consulta");
-		return list;*/
 	}
 
 	public List<TascaLlistatDto> findTasquesAmbId(Long entornId, List<Long> ids) {
-		List<JbpmTask> tasques = jbpmDao.findTasks(ids);
+		List<JbpmTask> tasques = workflowEngineApi.findTasks(ids);
 		List<TascaLlistatDto> resposta = new ArrayList<TascaLlistatDto>();
 		for (JbpmTask task: tasques) {
 			DadesCacheTasca dadesCacheTasca = getDadesCacheTasca(task);
@@ -983,7 +649,7 @@ public class TascaService {
 				taskId,
 				ExpedientLogAccioTipus.TASCA_REASSIGNAR,
 				previousActors);
-		jbpmDao.takeTaskInstance(taskId, usuari);
+		workflowEngineApi.takeTaskInstance(taskId, usuari);
 		getServiceUtils().expedientIndexLuceneUpdate(task.getProcessInstanceId());
 		String currentActors = expedientLogHelper.getActorsPerReassignacioTasca(taskId);
 		expedientLog.setAccioParams(previousActors + "::" + currentActors);
@@ -1020,7 +686,7 @@ public class TascaService {
 				taskId,
 				ExpedientLogAccioTipus.TASCA_REASSIGNAR,
 				previousActors);
-		jbpmDao.releaseTaskInstance(taskId);
+		workflowEngineApi.releaseTaskInstance(taskId);
 		getServiceUtils().expedientIndexLuceneUpdate(task.getProcessInstanceId());
 		String currentActors = expedientLogHelper.getActorsPerReassignacioTasca(taskId);
 		expedientLog.setAccioParams(previousActors + "::" + currentActors);
@@ -1061,7 +727,7 @@ public class TascaService {
 		JbpmTask task = comprovarSeguretatTasca(entornId, taskId, usuari, true);
 		Expedient expedient = null;
 		if (MesuresTemporalsHelper.isActiu()) { 
-			JbpmProcessInstance pi = jbpmDao.getRootProcessInstance(task.getProcessInstanceId());
+			JbpmProcessInstance pi = workflowEngineApi.getRootProcessInstance(task.getProcessInstanceId());
 			expedient = expedientDao.findAmbProcessInstanceId(pi.getId());
 			mesuresTemporalsHelper.mesuraIniciar("Guardar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName());
 			mesuresTemporalsHelper.mesuraIniciar("Guardar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "LOG");
@@ -1081,13 +747,13 @@ public class TascaService {
 			mesuresTemporalsHelper.mesuraCalcular("Guardar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "Optimitzar DOMINI");
 			mesuresTemporalsHelper.mesuraIniciar("Guardar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "Start TaskInstance");
 		}
-		jbpmDao.startTaskInstance(taskId);
+		workflowEngineApi.startTaskInstance(taskId);
 		if (MesuresTemporalsHelper.isActiu()) {
 			mesuresTemporalsHelper.mesuraCalcular("Guardar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "Start TaskInstance");
 			mesuresTemporalsHelper.mesuraIniciar("Guardar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "taskInstance Variables");
 		}
 		logger.debug("Guardant les dades v26 (filtreVariables= "+variables+")");
-		jbpmDao.setTaskInstanceVariables(taskId, variables, false);
+		workflowEngineApi.setTaskInstanceVariables(taskId, variables, false);
 		if (MesuresTemporalsHelper.isActiu()) {
 			mesuresTemporalsHelper.mesuraCalcular("Guardar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "taskInstance Variables");
 		}
@@ -1158,10 +824,10 @@ public class TascaService {
 			Object[] valors,
 			int index,
 			String usuari) {
-		JbpmTask task = jbpmDao.getTaskById(taskId);
+		JbpmTask task = workflowEngineApi.getTaskById(taskId);
 		Expedient expedient = null;
 		if (MesuresTemporalsHelper.isActiu()) {
-			JbpmProcessInstance pi = jbpmDao.getRootProcessInstance(task.getProcessInstanceId());
+			JbpmProcessInstance pi = workflowEngineApi.getRootProcessInstance(task.getProcessInstanceId());
 			expedient = expedientDao.findAmbProcessInstanceId(pi.getId());
 			mesuresTemporalsHelper.mesuraIniciar("Guardar registre", "tasques", expedient.getTipus().getNom(), task.getTaskName());
 		}
@@ -1174,7 +840,7 @@ public class TascaService {
 			mesuresTemporalsHelper.mesuraIniciar("Guardar registre", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "Guardar variable");
 		}
 		if (camp.isMultiple()) {
-			Object valor = jbpmDao.getTaskInstanceVariable(taskId, campCodi);
+			Object valor = workflowEngineApi.getTaskInstanceVariable(taskId, campCodi);
 			if (valor == null) {
 				guardarVariable(
 						entornId,
@@ -1231,10 +897,10 @@ public class TascaService {
 			String campCodi,
 			int index,
 			String usuari) {
-		JbpmTask task = jbpmDao.getTaskById(taskId);
+		JbpmTask task = workflowEngineApi.getTaskById(taskId);
 		Expedient expedient = null;
 		if (MesuresTemporalsHelper.isActiu()) {
-			JbpmProcessInstance pi = jbpmDao.getRootProcessInstance(task.getProcessInstanceId());
+			JbpmProcessInstance pi = workflowEngineApi.getRootProcessInstance(task.getProcessInstanceId());
 			expedient = expedientDao.findAmbProcessInstanceId(pi.getId());
 			mesuresTemporalsHelper.mesuraIniciar("Esborrar registre", "tasques", expedient.getTipus().getNom(), task.getTaskName());
 		}
@@ -1247,7 +913,7 @@ public class TascaService {
 			mesuresTemporalsHelper.mesuraIniciar("Esborrar registre", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "Guardar Variable");
 		}
 		if (camp.isMultiple()) {
-			Object valor = jbpmDao.getTaskInstanceVariable(taskId, campCodi);
+			Object valor = workflowEngineApi.getTaskInstanceVariable(taskId, campCodi);
 			if (valor != null) {
 				Object[] valorMultiple = (Object[])valor;
 				if (valorMultiple.length > 0) {
@@ -1292,7 +958,7 @@ public class TascaService {
 		JbpmTask task = comprovarSeguretatTasca(entornId, taskId, usuari, comprovarAssignacio);
 		Expedient expedient = null;
 		if (MesuresTemporalsHelper.isActiu()) {
-			JbpmProcessInstance pi = jbpmDao.getRootProcessInstance(task.getProcessInstanceId());
+			JbpmProcessInstance pi = workflowEngineApi.getRootProcessInstance(task.getProcessInstanceId());
 			expedient = expedientDao.findAmbProcessInstanceId(pi.getId());
 			mesuresTemporalsHelper.mesuraIniciar("Validar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName());
 			mesuresTemporalsHelper.mesuraIniciar("Validar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "LOG");
@@ -1311,12 +977,12 @@ public class TascaService {
 			mesuresTemporalsHelper.mesuraCalcular("Validar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "Optimitzar DOMINI");
 			mesuresTemporalsHelper.mesuraIniciar("Validar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "Start TaskInstance");
 		}
-		jbpmDao.startTaskInstance(taskId);
+		workflowEngineApi.startTaskInstance(taskId);
 		if (MesuresTemporalsHelper.isActiu()) {
 			mesuresTemporalsHelper.mesuraCalcular("Validar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "Start TaskInstance");
 			mesuresTemporalsHelper.mesuraIniciar("Validar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "taskInstance Variables");
 		}
-		jbpmDao.setTaskInstanceVariables(taskId, variables, false);
+		workflowEngineApi.setTaskInstanceVariables(taskId, variables, false);
 		if (MesuresTemporalsHelper.isActiu()) {
 			mesuresTemporalsHelper.mesuraCalcular("Validar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "taskInstance Variables");
 			mesuresTemporalsHelper.mesuraIniciar("Validar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "Validar");
@@ -1352,7 +1018,7 @@ public class TascaService {
 		JbpmTask task = comprovarSeguretatTasca(entornId, taskId, user, true);
 		Expedient expedient = null;
 		if (MesuresTemporalsHelper.isActiu()) {
-			JbpmProcessInstance pi = jbpmDao.getRootProcessInstance(task.getProcessInstanceId());
+			JbpmProcessInstance pi = workflowEngineApi.getRootProcessInstance(task.getProcessInstanceId());
 			expedient = expedientDao.findAmbProcessInstanceId(pi.getId());
 			mesuresTemporalsHelper.mesuraIniciar("Restaurar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName());
 			mesuresTemporalsHelper.mesuraIniciar("Restaurar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "LOG");
@@ -1419,12 +1085,9 @@ public class TascaService {
 		if (!isSignaturesComplet(task))
 			throw new IllegalStateException(
 					getServiceUtils().getMessage("error.tascaService.faltenSignar"));
-		ProcessInstanceExpedient piexp = jbpmDao.expedientFindByProcessInstanceId(
+		ProcessInstanceExpedient piexp = workflowEngineApi.expedientFindByProcessInstanceId(
 				task.getProcessInstanceId());
 		Expedient expedient = expedientDao.getById(piexp.getId(), false);
-		//JbpmProcessInstance pi = jbpmDao.getRootProcessInstance(task.getProcessInstanceId());
-		//Expedient expedient = expedientDao.findAmbProcessInstanceId(pi.getId());
-		//DadesCacheTasca dct = getDadesCacheTasca(task);
 		mesuresTemporalsHelper.tascaCompletarIniciar(expedient, taskId, task.getTaskName());
 		final Timer timerTotal = metricRegistry.timer(
 				MetricRegistry.name(
@@ -1472,10 +1135,10 @@ public class TascaService {
 					usuari);
 			//mesuresTemporalsHelper.mesuraCalcular("Completar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "LOG");
 			//mesuresTemporalsHelper.mesuraIniciar("Completar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "Start TaskInstance");
-			jbpmDao.startTaskInstance(taskId);
+			workflowEngineApi.startTaskInstance(taskId);
 			//mesuresTemporalsHelper.mesuraCalcular("Completar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "Start TaskInstance");
 			//mesuresTemporalsHelper.mesuraIniciar("Completar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "End TaskInstance");
-			jbpmDao.endTaskInstance(task.getId(), outcome);
+			workflowEngineApi.endTaskInstance(task.getId(), outcome);
 			//mesuresTemporalsHelper.mesuraCalcular("Completar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "End TaskInstance");
 			//mesuresTemporalsHelper.mesuraIniciar("Completar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "Delegation info");
 			// Accions per a una tasca delegada
@@ -1485,11 +1148,11 @@ public class TascaService {
 				//mesuresTemporalsHelper.mesuraIniciar("Completar tasca", "tasques", expedient.getTipus().getNom(), task.getTaskName(), "Delegation");
 				if (!taskId.equals(delegationInfo.getSourceTaskId())) {
 					// Copia les variables de la tasca delegada a la original
-					jbpmDao.setTaskInstanceVariables(
+					workflowEngineApi.setTaskInstanceVariables(
 							delegationInfo.getSourceTaskId(),
 							getVariablesDelegacio(task),
 							false);
-					JbpmTask taskOriginal = jbpmDao.getTaskById(delegationInfo.getSourceTaskId());
+					JbpmTask taskOriginal = workflowEngineApi.getTaskById(delegationInfo.getSourceTaskId());
 					if (!delegationInfo.isSupervised()) {
 						// Si no es supervisada també finalitza la tasca original
 						completar(entornId, taskOriginal.getId(), false, null, outcome);
@@ -1545,7 +1208,7 @@ public class TascaService {
 		Map<String, Object> variables = new HashMap<String, Object>();
 		variables.put(codiVariable, valor);
 		optimitzarConsultesDomini(task, variables);
-		jbpmDao.setTaskInstanceVariables(task.getId(), variables, false);
+		workflowEngineApi.setTaskInstanceVariables(task.getId(), variables, false);
 		TascaDto tasca = toTascaDto(task, null, true, true);
 		registreDao.crearRegistreCrearVariableTasca(
 				tasca.getExpedient().getId(),
@@ -1576,7 +1239,7 @@ public class TascaService {
 		Object valorVell = getServiceUtils().getVariableJbpmTascaValor(task.getId(), codiVariable);
 		Map<String, Object> variables = new HashMap<String, Object>();
 		variables.put(codiVariable, valor);
-		jbpmDao.setTaskInstanceVariables(task.getId(), variables, false);
+		workflowEngineApi.setTaskInstanceVariables(task.getId(), variables, false);
 		TascaDto tasca = toTascaDto(task, null, true, true);
 		if (user == null) {
 			user = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -1594,7 +1257,7 @@ public class TascaService {
 			String taskId,
 			String codiVariable) throws NotFoundException, IllegalStateException {
 		JbpmTask task = comprovarSeguretatTasca(entornId, taskId, null, true);
-		jbpmDao.deleteTaskInstanceVariable(task.getId(), codiVariable);
+		workflowEngineApi.deleteTaskInstanceVariable(task.getId(), codiVariable);
 		TascaDto tasca = toTascaDto(task, null, true, true);
 		registreDao.crearRegistreEsborrarVariableTasca(
 				tasca.getExpedient().getId(),
@@ -1610,7 +1273,7 @@ public class TascaService {
 			String comentari,
 			boolean supervisada)  throws NotFoundException, IllegalStateException{
 		JbpmTask original = comprovarSeguretatTasca(entornId, taskId, null, true);
-		JbpmTask delegada = jbpmDao.cloneTaskInstance(
+		JbpmTask delegada = workflowEngineApi.cloneTaskInstance(
 				taskId,
 				actorId,
 				getVariablesDelegacio(original));
@@ -1637,7 +1300,7 @@ public class TascaService {
 					getServiceUtils().getMessage("error.tascaService.cancelarDelegacio"));
 		}
 		// Cancelar la tasca delegada
-		jbpmDao.cancelTaskInstance(delegationInfo.getTargetTaskId());
+		workflowEngineApi.cancelTaskInstance(delegationInfo.getTargetTaskId());
 		// Esborram la delegació
 		deleteDelegationInfo(task);
 	}
@@ -1653,7 +1316,7 @@ public class TascaService {
 			throw new IllegalStateException(
 					getServiceUtils().getMessage("error.tascaService.noFormExtern"));
 		Map<String, Object> vars = getServiceUtils().getVariablesJbpmTascaValor(task.getId());
-		JbpmProcessInstance rootProcessInstance = jbpmDao.getRootProcessInstance(task.getProcessInstanceId());
+		JbpmProcessInstance rootProcessInstance = workflowEngineApi.getRootProcessInstance(task.getProcessInstanceId());
 		Expedient expedient = expedientDao.findAmbProcessInstanceId(rootProcessInstance.getId());
 		return formulariExternDao.iniciarFormulariExtern(
 				expedient.getTipus(),
@@ -1678,7 +1341,7 @@ public class TascaService {
 		if (definicioProcesId == null && definicioProces == null) {
 			logger.error("No s'ha trobat la definició de procés (entorn=" + expedientTipus.getEntorn().getCodi() + ", jbpmKey=" + expedientTipus.getJbpmProcessDefinitionKey() + ")");
 		}
-		String startTaskName = jbpmDao.getStartTaskName(definicioProces.getJbpmId());
+		String startTaskName = workflowEngineApi.getStartTaskName(definicioProces.getJbpmId());
 		Tasca tasca = tascaDao.findAmbActivityNameIProcessDefinitionId(
 				startTaskName,
 				definicioProces.getJbpmId());
@@ -1700,7 +1363,7 @@ public class TascaService {
 				dadesFormulariExternInicial.put(formulariId, variables);
 			} else {
 				Map<String, Object> valors = new HashMap<String, Object>();
-				JbpmTask task = jbpmDao.getTaskById(formExtern.getTaskId());
+				JbpmTask task = workflowEngineApi.getTaskById(formExtern.getTaskId());
 				Tasca tasca = tascaDao.findAmbActivityNameIProcessDefinitionId(
 						task.getTaskName(),
 						task.getProcessDefinitionId());
@@ -1733,7 +1396,7 @@ public class TascaService {
 			String taskId,
 			String campCodi,
 			String textInicial) {
-		JbpmTask task = jbpmDao.getTaskById(taskId);
+		JbpmTask task = workflowEngineApi.getTaskById(taskId);
 		DefinicioProces definicioProces = definicioProcesDao.findAmbJbpmId(task.getProcessDefinitionId());
 		return dtoConverter.getResultatConsultaDomini(
 				definicioProces,
@@ -1758,7 +1421,7 @@ public class TascaService {
 		JbpmTask task = comprovarSeguretatTasca(entornId, taskId, user, true);
 		Expedient expedient = null;
 		if (MesuresTemporalsHelper.isActiu()) {
-			JbpmProcessInstance pi = jbpmDao.getRootProcessInstance(task.getProcessInstanceId());
+			JbpmProcessInstance pi = workflowEngineApi.getRootProcessInstance(task.getProcessInstanceId());
 			expedient = expedientDao.findAmbProcessInstanceId(pi.getId());
 			mesuresTemporalsHelper.mesuraIniciar("Executar ACCIO" + accio, "tasques", expedient.getTipus().getNom(), task.getTaskName());
 			mesuresTemporalsHelper.mesuraIniciar("Executar ACCIO" + accio, "tasques", expedient.getTipus().getNom(), task.getTaskName(), "LOG");
@@ -1770,7 +1433,7 @@ public class TascaService {
 				user);
 		if (MesuresTemporalsHelper.isActiu())
 			mesuresTemporalsHelper.mesuraCalcular("Executar ACCIO" + accio, "tasques", expedient.getTipus().getNom(), task.getTaskName(), "LOG");
-		jbpmDao.executeActionInstanciaTasca(taskId, accio);
+		workflowEngineApi.executeActionInstanciaTasca(taskId, accio);
 		getServiceUtils().expedientIndexLuceneUpdate(task.getProcessInstanceId());
 		if (MesuresTemporalsHelper.isActiu())
 			mesuresTemporalsHelper.mesuraCalcular("Executar ACCIO" + accio, "tasques", expedient.getTipus().getNom(), task.getTaskName());
@@ -1807,8 +1470,8 @@ public class TascaService {
 		this.definicioProcesDao = definicioProcesDao;
 	}
 	@Autowired
-	public void setJbpmHelper(JbpmHelper jbpmDao) {
-		this.jbpmDao = jbpmDao;
+	public void setWorkflowEngineApi(WorkflowEngineApi workflowEngineApi) {
+		this.workflowEngineApi = workflowEngineApi;
 	}
 	@Autowired
 	public void setAclServiceDao(AclServiceDao aclServiceDao) {
@@ -1871,7 +1534,7 @@ public class TascaService {
 
 
 	private JbpmTask comprovarSeguretatTasca(Long entornId, String taskId, String usuari, boolean comprovarAssignacio) throws NotFoundException, IllegalStateException {
-		JbpmTask task = jbpmDao.getTaskById(taskId);
+		JbpmTask task = workflowEngineApi.getTaskById(taskId);
 		if (task == null) {
 			throw new NotFoundException(
 					getServiceUtils().getMessage("error.tascaService.noTrobada"));
@@ -1983,7 +1646,7 @@ public class TascaService {
 			ResultatConsultaPaginadaJbpm<JbpmTask> tasks;
 			try {
 				// Consulta els expedients de l'entorn que compleixen el filtre
-				tasks = jbpmDao.tascaFindByFiltrePaginat(
+				tasks = workflowEngineApi.tascaFindByFiltrePaginat(
 						entornId,
 						usuari,
 						taskName,
@@ -2000,7 +1663,8 @@ public class TascaService {
 						mostrarAssignadesUsuari,
 						mostrarAssignadesGrup,
 						nomesPendents,
-						paginacioParams);
+						paginacioParams,
+						false);
 			} finally {
 				contextTasques.stop();
 			}
@@ -2030,202 +1694,6 @@ public class TascaService {
 		}
 		return resposta;
 	}
-	/*private List<TascaLlistatDto> tasquesFiltradesPerEntorn(
-			Long entornId,
-			List<JbpmTask> tasques,
-			boolean complet) {
-		// Filtra les tasques per mostrar només les del entorn seleccionat
-		List<TascaLlistatDto> filtrades = new ArrayList<TascaLlistatDto>();
-		for (JbpmTask task: tasques) {
-			DadesCacheTasca dadesCacheTasca = getDadesCacheTasca(task);
-			Long currentEntornId = dadesCacheTasca.getEntornId();
-			if (currentEntornId != null && entornId.equals(currentEntornId)) {
-				TascaLlistatDto dto = toTascaLlistatDto(task, null);
-				if (complet) {
-					dto.setExpedientNumero(dadesCacheTasca.getNumeroIdentificador());
-					Tasca tasca = tascaDao.findAmbActivityNameIProcessDefinitionId(
-							task.getName(),
-							task.getProcessDefinitionId());
-					dto.setMissatgeInfo(tasca.getMissatgeInfo());
-					dto.setMissatgeWarn(tasca.getMissatgeWarn());
-					dto.setResultats(
-							jbpmDao.findTaskInstanceOutcomes(task.getId()));
-				}
-				filtrades.add(dto);
-			}
-		}
-		return filtrades;
-	}*/
-	/*private PaginaLlistatDto tasquesLlistatFiltradesValors(
-			Long entornId,
-			List<JbpmTask> tasques,
-			String tasca,
-			String expedient,
-			Long tipusExpedient,
-			Date dataCreacioInici,
-			Date dataCreacioFi,
-			Integer prioritat,
-			Date dataLimitInici,
-			Date dataLimitFi,
-			int firstRow,
-			int maxResults,
-			String sort,
-			boolean asc) {
-		return tasquesLlistatFiltradesValors(
-				entornId,
-				tasques,
-				tasca,
-				expedient,
-				tipusExpedient,
-				dataCreacioInici,
-				dataCreacioFi,
-				prioritat,
-				dataLimitInici,
-				dataLimitFi,
-				firstRow,
-				maxResults,
-				sort,
-				asc, 
-				false);
-	}*/
-	/*private PaginaLlistatDto tasquesLlistatFiltradesValors(
-			Long entornId,
-			List<JbpmTask> tasques,
-			String tasca,
-			String expedient,
-			Long tipusExpedient,
-			Date dataCreacioInici,
-			Date dataCreacioFi,
-			Integer prioritat,
-			Date dataLimitInici,
-			Date dataLimitFi,
-			int firstRow,
-			int maxResults,
-			String sort,
-			boolean asc,
-			boolean ambPersones) {
-		//MesurarTemps.diferenciaReiniciar("LT_TASQUES_FLT");
-		// Filtra primer els camps dels tasks
-		Iterator<JbpmTask> it = tasques.iterator();
-		while (it.hasNext()) {
-			JbpmTask task = it.next();
-			if (dataCreacioInici != null && task.getCreateTime().before(dataCreacioInici))
-				it.remove();
-			if (dataCreacioFi != null && task.getCreateTime().after(dataCreacioFi))
-				it.remove();
-			if (dataLimitInici != null && task.getDueDate().before(dataLimitInici))
-				it.remove();
-			if (dataLimitFi != null && task.getDueDate().after(dataLimitFi))
-				it.remove();
-			if (prioritat != null && prioritat.intValue() != task.getPriority())
-				it.remove();
-		}
-		//MesurarTemps.diferenciaImprimirStdoutIReiniciar("LT_TASQUES_FLT", "1");
-		// Després filtra els altres camps
-		List<DadesTascaOrdenacio> filtrades = new ArrayList<DadesTascaOrdenacio>();
-		//MesurarTemps.mitjaReiniciar("LT_TASQUES_DIF1");
-		//MesurarTemps.mitjaReiniciar("LT_TASQUES_DIF2");
-		for (JbpmTask task: tasques) {
-			//MesurarTemps.diferenciaReiniciar("LT_TASQUES_DIF");
-			DadesCacheTasca dadesCacheTasca = getDadesCacheTasca(task);
-			//MesurarTemps.mitjaCalcular("LT_TASQUES_DIF1", "LT_TASQUES_DIF");
-			Long currentEntornId = dadesCacheTasca.getEntornId();
-			if ((currentEntornId != null) && (entornId.equals(currentEntornId))) {
-				Boolean incloure = true;
-				if (tasca != null && tasca.length() > 0) {
-					String titolTasca = normalitzaText(dadesCacheTasca.getTitol());
-					String titolFiltre = normalitzaText(tasca);
-					incloure = incloure && titolTasca.contains(titolFiltre);
-				}
-				if (expedient != null && expedient.length() > 0) {
-					String expedientTasca = normalitzaText(dadesCacheTasca.getIdentificador());
-					String expedientFiltre = normalitzaText(expedient);
-					incloure = incloure && expedientTasca.contains(expedientFiltre);
-				}
-				if (tipusExpedient != null)
-					incloure = incloure && tipusExpedient.longValue() == dadesCacheTasca.getExpedientTipusId();
-				if (incloure) {
-					filtrades.add(
-							new DadesTascaOrdenacio(
-									task.getId(),
-									dadesCacheTasca.getTitol(),
-									dadesCacheTasca.getNumeroIdentificador(),
-									dadesCacheTasca.getExpedientTipusNom(),
-									task.getCreateTime(),
-									task.getPriority(),
-									task.getDueDate()));
-				}
-			}
-			//MesurarTemps.mitjaCalcular("LT_TASQUES_DIF2", "LT_TASQUES_DIF");
-		}
-		//MesurarTemps.mitjaImprimirStdout("LT_TASQUES_DIF1", "A");
-		//MesurarTemps.mitjaImprimirStdout("LT_TASQUES_DIF2", "A");
-		//MesurarTemps.diferenciaImprimirStdoutIReiniciar("LT_TASQUES_FLT", "2");
-		final String finalSort = sort;
-		final boolean finalAsc = asc;
-		Comparator<DadesTascaOrdenacio> comparador = new Comparator<DadesTascaOrdenacio>() {
-			public int compare(DadesTascaOrdenacio t1, DadesTascaOrdenacio t2) {
-				int result = 0;
-				NullComparator nullComparator = new NullComparator();
-				if ("titol".equals(finalSort)) {
-					if (finalAsc)
-						result = nullComparator.compare(t1.getTitol(), t2.getTitol());
-					else
-						result = nullComparator.compare(t2.getTitol(), t1.getTitol());
-				} else if ("expedientTitol".equals(finalSort)) {
-					if (finalAsc)
-						result = nullComparator.compare(t1.getExpedientTitol(), t2.getExpedientTitol());
-					else 
-						result = nullComparator.compare(t2.getExpedientTitol(), t1.getExpedientTitol());
-				} else if ("expedientTipusNom".equals(finalSort)) {
-					if (finalAsc)
-						result = nullComparator.compare(t1.getExpedientTipusNom(), t2.getExpedientTipusNom());
-					else
-						result = nullComparator.compare(t2.getExpedientTipusNom(), t1.getExpedientTipusNom());
-				} else if ("dataCreacio".equals(finalSort)) {
-					if (finalAsc)
-						result = nullComparator.compare(t1.getDataCreacio(), t2.getDataCreacio());
-					else
-						result = nullComparator.compare(t2.getDataCreacio(), t1.getDataCreacio());
-				} else if ("prioritat".equals(finalSort)) {
-					if (finalAsc)
-						result = t1.getPrioritat() - t2.getPrioritat();
-					else
-						result = t2.getPrioritat() - t1.getPrioritat();
-				} else if ("dataLimit".equals(finalSort)) {
-					if (finalAsc)
-						result = nullComparator.compare(t1.getDataLimit(), t2.getDataLimit());
-					else
-						result = nullComparator.compare(t2.getDataLimit(), t1.getDataLimit());
-				}
-				return result;
-			}
-		};
-		Collections.sort(filtrades, comparador);
-		List<DadesTascaOrdenacio> respostaDades;
-		if (filtrades.size() <= firstRow + maxResults)
-			respostaDades = filtrades.subList(firstRow, filtrades.size());
-		else
-			respostaDades = filtrades.subList(firstRow, firstRow + maxResults);
-		List<TascaLlistatDto> respostaLlistat = new ArrayList<TascaLlistatDto>();
-		//MesurarTemps.diferenciaImprimirStdoutIReiniciar("LT_TASQUES_FLT", "3");
-		for (DadesTascaOrdenacio dades: respostaDades) {
-			for (JbpmTask task: tasques) {
-				if (task.getId().equals(dades.getTaskId())) {
-					respostaLlistat.add(
-							toTascaLlistatDto(
-									task,
-									getDadesCacheTasca(task),
-									ambPersones));
-					break;
-				}
-			}
-		}
-		//MesurarTemps.diferenciaImprimirStdoutIReiniciar("LT_TASQUES_FLT", "4");
-		return new PaginaLlistatDto(
-				filtrades.size(),
-				respostaLlistat);
-	}*/
 	private List<TascaLlistatDto> tasquesPerTramitacioMasiva(
 			Long entornId,
 			List<JbpmTask> tasques,
@@ -2264,13 +1732,13 @@ public class TascaService {
 	}*/
 
 	private void validarTasca(String taskId) {
-		jbpmDao.setTaskInstanceVariable(
+		workflowEngineApi.setTaskInstanceVariable(
 				taskId,
 				VAR_TASCA_VALIDADA,
 				new Date());
 	}
 	private void restaurarTasca(String taskId) {
-		jbpmDao.deleteTaskInstanceVariable(taskId, VAR_TASCA_VALIDADA);
+		workflowEngineApi.deleteTaskInstanceVariable(taskId, VAR_TASCA_VALIDADA);
 	}
 	private boolean isTascaValidada(JbpmTask task) {
 		Tasca tasca = tascaDao.findAmbActivityNameIProcessDefinitionId(
@@ -2285,7 +1753,7 @@ public class TascaService {
 		}
 		if (!hiHaCampsModificables)
 			return true;
-		Object valor = jbpmDao.getTaskInstanceVariable(task.getId(), VAR_TASCA_VALIDADA);
+		Object valor = workflowEngineApi.getTaskInstanceVariable(task.getId(), VAR_TASCA_VALIDADA);
 		if (valor == null || !(valor instanceof Date))
 			return false;
 		return true;
@@ -2298,7 +1766,7 @@ public class TascaService {
 		for (DocumentTasca docTasca: tasca.getDocuments()) {
 			if (docTasca.isRequired()) {
 				String codiJbpm = JbpmVars.PREFIX_DOCUMENT + docTasca.getDocument().getCodi();
-				Object valor = jbpmDao.getTaskInstanceVariable(
+				Object valor = workflowEngineApi.getTaskInstanceVariable(
 						task.getId(),
 						codiJbpm);
 				if (valor == null) {
@@ -2317,7 +1785,7 @@ public class TascaService {
 		for (FirmaTasca firmaTasca: tasca.getFirmes()) {
 			if (firmaTasca.isRequired()) {
 				String codiJbpm = JbpmVars.PREFIX_SIGNATURA + firmaTasca.getDocument().getCodi();
-				Object valor = jbpmDao.getTaskInstanceVariable(task.getId(), codiJbpm);
+				Object valor = workflowEngineApi.getTaskInstanceVariable(task.getId(), codiJbpm);
 				if (valor == null)
 					ok = false;
 			}
@@ -2337,23 +1805,23 @@ public class TascaService {
 		info.setStart(new Date());
 		info.setComment(comentari);
 		info.setSupervised(supervisada);
-		jbpmDao.setTaskInstanceVariable(
+		workflowEngineApi.setTaskInstanceVariable(
 				task.getId(), 
 				VAR_TASCA_DELEGACIO,
 				info);
 	}
 	private DelegationInfo getDelegationInfo(JbpmTask task) {
-		return (DelegationInfo)jbpmDao.getTaskInstanceVariable(
+		return (DelegationInfo)workflowEngineApi.getTaskInstanceVariable(
 				task.getId(),
 				VAR_TASCA_DELEGACIO);
 	}
 	private void deleteDelegationInfo(JbpmTask task) {
-		jbpmDao.deleteTaskInstanceVariable(
+		workflowEngineApi.deleteTaskInstanceVariable(
 				task.getId(),
 				VAR_TASCA_DELEGACIO);
 	}
 	private Map<String, Object> getVariablesDelegacio(JbpmTask task) {
-		return jbpmDao.getTaskInstanceVariables(task.getId());
+		return workflowEngineApi.getTaskInstanceVariables(task.getId());
 	}
 
 	private TascaLlistatDto toTascaLlistatDto(
@@ -2378,7 +1846,7 @@ public class TascaService {
 		dto.setSuspesa(task.isSuspended());
 		dto.setProcessInstanceId(task.getProcessInstanceId());
 		dto.setAgafada(task.isAgafada());
-		Map<String, Object> valorsTasca = jbpmDao.getTaskInstanceVariables(task.getId());
+		Map<String, Object> valorsTasca = workflowEngineApi.getTaskInstanceVariables(task.getId());
 		DelegationInfo delegationInfo = (DelegationInfo)valorsTasca.get(
 				TascaService.VAR_TASCA_DELEGACIO);
 		if (delegationInfo != null) {
@@ -2389,17 +1857,17 @@ public class TascaService {
 			dto.setDelegacioSupervisada(delegationInfo.isSupervised());
 			dto.setDelegacioComentari(delegationInfo.getComment());
 			if (original) {
-				JbpmTask tascaDelegacio = jbpmDao.getTaskById(delegationInfo.getTargetTaskId());
+				JbpmTask tascaDelegacio = workflowEngineApi.getTaskById(delegationInfo.getTargetTaskId());
 				dto.setDelegacioPersona(pluginPersonaDao.findAmbCodiPlugin(tascaDelegacio.getAssignee()));
 			} else {
-				JbpmTask tascaDelegacio = jbpmDao.getTaskById(delegationInfo.getSourceTaskId());
+				JbpmTask tascaDelegacio = workflowEngineApi.getTaskById(delegationInfo.getSourceTaskId());
 				dto.setDelegacioPersona(pluginPersonaDao.findAmbCodiPlugin(tascaDelegacio.getAssignee()));
 			}
 		}
 		DadesCacheTasca dadesCacheTasca = getDadesCacheTasca(task);
 		dto.setTitol(dadesCacheTasca.getTitol());
 		dto.setTramitacioMassiva(dadesCacheTasca.isTramitacioMassiva());
-		ProcessInstanceExpedient expedient = jbpmDao.expedientFindByProcessInstanceId(
+		ProcessInstanceExpedient expedient = workflowEngineApi.expedientFindByProcessInstanceId(
 				task.getProcessInstanceId());
 		dto.setExpedientTitol(expedient.getIdentificador());
 		dto.setExpedientTitolOrdenacio(expedient.getIdPerOrdenacio());
@@ -2430,7 +1898,7 @@ public class TascaService {
 			terminiIniciat.setDataCompletat(new Date());
 			esborrarAlertesAntigues(terminiIniciat);
 			if (terminiIniciat.getTermini().isAlertaCompletat()) {
-				JbpmTask task = jbpmDao.getTaskById(taskId);
+				JbpmTask task = workflowEngineApi.getTaskById(taskId);
 				if (task.getAssignee() != null) {
 					crearAlertaCompletat(terminiIniciat, task.getAssignee(), expedient);
 				} else {
@@ -2462,7 +1930,7 @@ public class TascaService {
 
 	private void verificarFinalitzacioExpedient(
 			Expedient expedient) {
-		JbpmProcessInstance pi = jbpmDao.getProcessInstance(expedient.getProcessInstanceId());
+		JbpmProcessInstance pi = workflowEngineApi.getProcessInstance(expedient.getProcessInstanceId());
 		if (pi.getEnd() != null) {
 			// Actualitzar data de fi de l'expedient
 			expedient.setDataFi(pi.getEnd());
@@ -2472,7 +1940,7 @@ public class TascaService {
 					terminiIniciat.setDataCancelacio(new Date());
 					long[] timerIds = terminiIniciat.getTimerIdsArray();
 					for (int i = 0; i < timerIds.length; i++)
-						jbpmDao.suspendTimer(
+						workflowEngineApi.suspendTimer(
 								timerIds[i],
 								new Date(Long.MAX_VALUE));
 				}
@@ -2489,7 +1957,7 @@ public class TascaService {
 					consultaCampDao,
 					luceneDao,
 					dtoConverter,
-					jbpmDao,
+					workflowEngineApi,
 					aclServiceDao,
 					messageSource,
 					metricRegistry);
@@ -2529,7 +1997,7 @@ public class TascaService {
 	private DadesCacheTasca getDadesCacheTasca(JbpmTask task) {
 		DadesCacheTasca dadesCache = null;
 		if (!task.isCacheActiu()) {
-			ProcessInstanceExpedient expedient = jbpmDao.expedientFindByProcessInstanceId(task.getProcessInstanceId());
+			ProcessInstanceExpedient expedient = workflowEngineApi.expedientFindByProcessInstanceId(task.getProcessInstanceId());
 			Tasca tasca = tascaDao.findAmbActivityNameIProcessDefinitionId(
 					task.getTaskName(),
 					task.getProcessDefinitionId());
@@ -2549,7 +2017,7 @@ public class TascaService {
 					"definicioProcesJbpmKey",
 					tasca.getDefinicioProces().getJbpmKey());
 			task.setCacheActiu();
-			jbpmDao.describeTaskInstance(
+			workflowEngineApi.describeTaskInstance(
 					task.getId(),
 					titol,
 					task.getDescriptionWithFields());

@@ -25,7 +25,7 @@ import net.conselldemallorca.helium.core.model.hibernate.ExpedientLog;
 import net.conselldemallorca.helium.core.model.hibernate.ExpedientLog.ExpedientLogAccioTipus;
 import net.conselldemallorca.helium.core.model.hibernate.Registre;
 import net.conselldemallorca.helium.core.security.ExtendedPermission;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessInstance;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmTask;
 import net.conselldemallorca.helium.v3.core.api.dto.ExpedientTascaDto;
@@ -56,8 +56,7 @@ public class ExpedientTascaServiceImpl implements ExpedientTascaService {
 	@Resource(name = "permisosHelperV3")
 	private PermisosHelper permisosHelper;
 	@Resource
-	private JbpmHelper jbpmHelper;
-
+	private WorkflowEngineApi workflowEngineApi;
 
 
 	/**
@@ -121,7 +120,7 @@ public class ExpedientTascaServiceImpl implements ExpedientTascaService {
 						ExtendedPermission.TASK_SUPERV,
 						ExtendedPermission.ADMINISTRATION});
 		List<ExpedientTascaDto> resposta = new ArrayList<ExpedientTascaDto>();
-		for (JbpmProcessInstance jpi: jbpmHelper.getProcessInstanceTree(expedient.getProcessInstanceId())) {
+		for (JbpmProcessInstance jpi: workflowEngineApi.getProcessInstanceTree(expedient.getProcessInstanceId())) {
 			resposta.addAll(
 					tascaHelper.findTasquesPerExpedientPerInstanciaProces(
 							jpi.getId(),
@@ -155,7 +154,7 @@ public class ExpedientTascaServiceImpl implements ExpedientTascaService {
 					task.getProcessInstanceId(),
 					ExpedientLogAccioTipus.TASCA_CANCELAR,
 					null);
-			jbpmHelper.cancelTaskInstance(String.valueOf(tascaId));
+			workflowEngineApi.cancelTaskInstance(String.valueOf(tascaId));
 			crearRegistreTasca(
 					expedientId,
 					String.valueOf(tascaId),
@@ -188,7 +187,7 @@ public class ExpedientTascaServiceImpl implements ExpedientTascaService {
 					task.getProcessInstanceId(),
 					ExpedientLogAccioTipus.TASCA_SUSPENDRE,
 					null);
-			jbpmHelper.suspendTaskInstance(String.valueOf(tascaId));
+			workflowEngineApi.suspendTaskInstance(String.valueOf(tascaId));
 			crearRegistreTasca(
 					expedientId,
 					String.valueOf(tascaId),
@@ -221,7 +220,7 @@ public class ExpedientTascaServiceImpl implements ExpedientTascaService {
 					task.getProcessInstanceId(),
 					ExpedientLogAccioTipus.TASCA_CONTINUAR,
 					null);
-			jbpmHelper.resumeTaskInstance(String.valueOf(tascaId));
+			workflowEngineApi.resumeTaskInstance(String.valueOf(tascaId));
 			crearRegistreTasca(
 					expedientId,
 					String.valueOf(tascaId),
@@ -258,7 +257,7 @@ public class ExpedientTascaServiceImpl implements ExpedientTascaService {
 				ExpedientLogAccioTipus.TASCA_REASSIGNAR,
 				null);
 		if (!expedient.isAturat()) {
-			jbpmHelper.reassignTaskInstance(tascaId, expressio, expedient.getEntorn().getId());
+			workflowEngineApi.reassignTaskInstance(tascaId, expressio, expedient.getEntorn().getId());
 			String currentActors = expedientLoggerHelper.getActorsPerReassignacioTasca(tascaId);
 			expedientLog.setAccioParams(previousActors + "::" + currentActors);
 			String usuari = SecurityContextHolder.getContext().getAuthentication().getName();

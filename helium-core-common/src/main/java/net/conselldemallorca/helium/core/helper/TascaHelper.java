@@ -13,6 +13,14 @@ import java.util.Set;
 
 import javax.annotation.Resource;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.acls.model.Permission;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+
+import edu.emory.mathcs.backport.java.util.Collections;
 import net.conselldemallorca.helium.core.common.JbpmVars;
 import net.conselldemallorca.helium.core.helper.TascaSegonPlaHelper.InfoSegonPla;
 import net.conselldemallorca.helium.core.model.hibernate.Camp;
@@ -25,9 +33,9 @@ import net.conselldemallorca.helium.core.model.hibernate.ExpedientTipus;
 import net.conselldemallorca.helium.core.model.hibernate.FirmaTasca;
 import net.conselldemallorca.helium.core.model.hibernate.Tasca;
 import net.conselldemallorca.helium.core.security.ExtendedPermission;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.integracio.DelegationInfo;
 import net.conselldemallorca.helium.jbpm3.integracio.DominiCodiDescripcio;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessInstance;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmTask;
 import net.conselldemallorca.helium.jbpm3.integracio.ResultatConsultaPaginadaJbpm;
@@ -42,15 +50,6 @@ import net.conselldemallorca.helium.v3.core.api.exception.TascaNoDisponibleExcep
 import net.conselldemallorca.helium.v3.core.repository.CampTascaRepository;
 import net.conselldemallorca.helium.v3.core.repository.DefinicioProcesRepository;
 import net.conselldemallorca.helium.v3.core.repository.TascaRepository;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.security.acls.model.Permission;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
-
-import edu.emory.mathcs.backport.java.util.Collections;
 
 /**
  * Helper per a gestionar les tasques dels expedients.
@@ -71,7 +70,7 @@ public class TascaHelper {
 	@Resource
 	private CampTascaRepository campTascaRepository;
 	@Resource
-	private JbpmHelper jbpmHelper;
+	private WorkflowEngineApi workflowEngineApi;
 	@Resource
 	private ConversioTipusHelper conversioTipusHelper;
 	@Resource(name = "permisosHelperV3")
@@ -90,7 +89,7 @@ public class TascaHelper {
 			boolean comprovarAssignacio,
 			boolean comprovarPendent) {
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-		JbpmTask task = jbpmHelper.getTaskById(id);
+		JbpmTask task = workflowEngineApi.getTaskById(id);
 		if (task == null) {
 			logger.debug("No s'ha trobat la tasca (" +
 					"id=" + id + ")");
@@ -184,7 +183,7 @@ public class TascaHelper {
 				"definicioProcesJbpmKey",
 				tasca.getDefinicioProces().getJbpmKey());
 		task.setCacheActiu();
-		jbpmHelper.describeTaskInstance(
+		workflowEngineApi.describeTaskInstance(
 				task.getId(),
 				titol,
 				task.getDescriptionWithFields());
@@ -272,13 +271,13 @@ public class TascaHelper {
 	public JbpmTask comprovarTascaPertanyExpedient(
 			String taskId,
 			Expedient expedient) {
-		JbpmTask task = jbpmHelper.getTaskById(taskId);
+		JbpmTask task = workflowEngineApi.getTaskById(taskId);
 		if (task == null) {
 			logger.debug("No s'ha trobat la tasca (" +
 					"taskId=" + taskId + ")");
 			throw new NoTrobatException(JbpmTask.class, taskId);
 		}
-		JbpmProcessInstance rootProcessInstance = jbpmHelper.getRootProcessInstance(
+		JbpmProcessInstance rootProcessInstance = workflowEngineApi.getRootProcessInstance(
 				task.getProcessInstanceId());
 		if (!expedient.getProcessInstanceId().equals(rootProcessInstance.getId())) {
 			logger.debug("La tasca no pertany a l'expedient (" +
@@ -308,7 +307,7 @@ public class TascaHelper {
 		paginacioParams.setPaginaNum(0);
 		paginacioParams.setPaginaTamany(-1);
 		paginacioParams.afegirOrdre("dataCreacio", OrdreDireccioDto.DESCENDENT);
-		ResultatConsultaPaginadaJbpm<JbpmTask> tasks = jbpmHelper.tascaFindByFiltrePaginat(
+		ResultatConsultaPaginadaJbpm<JbpmTask> tasks = workflowEngineApi.tascaFindByFiltrePaginat(
 				expedient.getEntorn().getId(),
 				(isPermisSupervision) ? null : auth.getName(),
 				null,
@@ -325,7 +324,8 @@ public class TascaHelper {
 				true,
 				true,
 				false,
-				paginacioParams);
+				paginacioParams,
+				false);
 		for (JbpmTask task: tasks.getLlista()) {
 			resposta.add(
 					toExpedientTascaDto(
@@ -369,7 +369,7 @@ public class TascaHelper {
 		/*dto.setDefinicioProces(
 				conversioTipusHelper.convertir(
 						tasca.getDefinicioProces(), DefinicioProcesDto.class));*/
-		dto.setOutcomes(jbpmHelper.findStartTaskOutcomes(jbpmId, startTaskName));
+		dto.setOutcomes(workflowEngineApi.findStartTaskOutcomes(jbpmId, startTaskName));
 		dto.setTascaFormExternCodi(tasca.getFormExtern());
 		return dto;
 	}
@@ -383,8 +383,8 @@ public class TascaHelper {
 			titol = tasca.getNom();
 			if (tasca.getNomScript() != null && tasca.getNomScript().length() > 0) {
 				List<String> campsExpressio = getCampsExpressioTitol(tasca.getNomScript());
-				Map<String, Object> valors = jbpmHelper.getTaskInstanceVariables(task.getId());
-				Map<String, Object> procesInstanceVariables = jbpmHelper.getProcessInstanceVariables(task.getProcessInstanceId());
+				Map<String, Object> valors = workflowEngineApi.getTaskInstanceVariables(task.getId());
+				Map<String, Object> procesInstanceVariables = workflowEngineApi.getProcessInstanceVariables(task.getProcessInstanceId());
 				if (procesInstanceVariables != null)
 					valors.putAll(procesInstanceVariables);
 				for (String campCodi: campsExpressio) {
@@ -415,7 +415,7 @@ public class TascaHelper {
 					}
 				}
 				try {
-					titol = (String)jbpmHelper.evaluateExpression(
+					titol = (String)workflowEngineApi.evaluateExpression(
 							task.getId(),
 							task.getProcessInstanceId(),
 							tasca.getNomScript(),
@@ -431,13 +431,13 @@ public class TascaHelper {
 	}
 
 	public void createDadesTasca(Long taskId) {
-		JbpmTask task = jbpmHelper.getTaskById(String.valueOf(taskId));
+		JbpmTask task = workflowEngineApi.getTaskById(String.valueOf(taskId));
 		setTascaCache(task, null);
 	}
 
 	public Tasca findTascaByJbpmTaskId(
 			String jbpmTaskId) {
-		return findTascaByJbpmTask(jbpmHelper.getTaskById(jbpmTaskId));
+		return findTascaByJbpmTask(workflowEngineApi.getTaskById(jbpmTaskId));
 	}
 	public Tasca findTascaByJbpmTask(
 			JbpmTask task) {
@@ -453,7 +453,7 @@ public class TascaHelper {
 			boolean nomesTasquesPersonals,
 			boolean nomesTasquesGrup) {
 		List<ExpedientTascaDto> resposta = new ArrayList<ExpedientTascaDto>();
-		List<JbpmTask> tasks = jbpmHelper.findTaskInstancesForProcessInstance(processInstanceId);
+		List<JbpmTask> tasks = workflowEngineApi.findTaskInstancesForProcessInstance(processInstanceId);
 		for (JbpmTask task: tasks) {
 			if (!task.isCompleted()) {
 				ExpedientTascaDto tasca = toExpedientTascaDto(
@@ -482,7 +482,7 @@ public class TascaHelper {
 			boolean completed,
 			boolean mostrarDeOtrosUsuarios) {
 		List<ExpedientTascaDto> resposta = new ArrayList<ExpedientTascaDto>();
-		List<JbpmTask> tasks = jbpmHelper.findTaskInstancesForProcessInstance(processInstanceId);
+		List<JbpmTask> tasks = workflowEngineApi.findTaskInstancesForProcessInstance(processInstanceId);
 		for (JbpmTask task: tasks) {
 			ExpedientTascaDto tasca = toExpedientTascaDto(
 					task,
@@ -552,7 +552,7 @@ public class TascaHelper {
 		}
 		if (perTramitacio) {
 			// Opcional outcomes?
-			dto.setOutcomes(jbpmHelper.findTaskInstanceOutcomes(task.getId()));
+			dto.setOutcomes(workflowEngineApi.findTaskInstanceOutcomes(task.getId()));
 			// Opcional dades tasca?
 			
 			dto.setTascaId(tasca.getId());
@@ -581,9 +581,9 @@ public class TascaHelper {
 				dto.setDelegacioSupervisada(delegationInfo.isSupervised());
 				JbpmTask tascaDelegacio = null;
 				if (original) {
-					tascaDelegacio = jbpmHelper.getTaskById(delegationInfo.getTargetTaskId());
+					tascaDelegacio = workflowEngineApi.getTaskById(delegationInfo.getTargetTaskId());
 				} else {
-					tascaDelegacio = jbpmHelper.getTaskById(delegationInfo.getSourceTaskId());
+					tascaDelegacio = workflowEngineApi.getTaskById(delegationInfo.getSourceTaskId());
 				}			
 				dto.setDelegacioPersona(
 						pluginHelper.personaFindAmbCodi(tascaDelegacio.getAssignee()));
@@ -629,13 +629,13 @@ public class TascaHelper {
 	}
 
 	public void validarTasca(String taskId) {
-		jbpmHelper.setTaskInstanceVariable(
+		workflowEngineApi.setTaskInstanceVariable(
 				taskId,
 				JbpmVars.VAR_TASCA_VALIDADA,
 				new Date());
 	}
 	public void restaurarTasca(String taskId) {
-		jbpmHelper.deleteTaskInstanceVariable(
+		workflowEngineApi.deleteTaskInstanceVariable(
 				taskId,
 				JbpmVars.VAR_TASCA_VALIDADA);
 	}
@@ -653,7 +653,7 @@ public class TascaHelper {
 		}
 		if (!hiHaCampsModificables)
 			return true;
-		Object valor = jbpmHelper.getTaskInstanceVariable(
+		Object valor = workflowEngineApi.getTaskInstanceVariable(
 				((JbpmTask)task).getId(),
 				JbpmVars.VAR_TASCA_VALIDADA);
 		if (valor == null || !(valor instanceof Date))
@@ -666,7 +666,7 @@ public class TascaHelper {
 		for (DocumentTasca docTasca: tasca.getDocuments()) {
 			if (docTasca.isRequired()) {
 				String codiJbpm = JbpmVars.PREFIX_DOCUMENT + docTasca.getDocument().getCodi();
-				Object valor = jbpmHelper.getTaskInstanceVariable(
+				Object valor = workflowEngineApi.getTaskInstanceVariable(
 						((JbpmTask)task).getId(),
 						codiJbpm);
 				if (valor == null) {
@@ -683,7 +683,7 @@ public class TascaHelper {
 		for (FirmaTasca firmaTasca: tasca.getFirmes()) {
 			if (firmaTasca.isRequired()) {
 				String codiJbpm = JbpmVars.PREFIX_SIGNATURA + firmaTasca.getDocument().getCodi();
-				Object valor = jbpmHelper.getTaskInstanceVariable(((JbpmTask)task).getId(), codiJbpm);
+				Object valor = workflowEngineApi.getTaskInstanceVariable(((JbpmTask)task).getId(), codiJbpm);
 				if (valor == null)
 					ok = false;
 			}
@@ -735,18 +735,18 @@ public class TascaHelper {
 		info.setStart(new Date());
 		info.setComment(comentari);
 		info.setSupervised(supervisada);
-		jbpmHelper.setTaskInstanceVariable(
+		workflowEngineApi.setTaskInstanceVariable(
 				task.getId(), 
 				JbpmVars.VAR_TASCA_DELEGACIO,
 				info);
 	}
 	public DelegationInfo getDelegationInfo(JbpmTask task) {
-		return (DelegationInfo)jbpmHelper.getTaskInstanceVariable(
+		return (DelegationInfo)workflowEngineApi.getTaskInstanceVariable(
 				task.getId(),
 				JbpmVars.VAR_TASCA_DELEGACIO);
 	}
 	public void deleteDelegationInfo(JbpmTask task) {
-		jbpmHelper.deleteTaskInstanceVariable(
+		workflowEngineApi.deleteTaskInstanceVariable(
 				task.getId(),
 				JbpmVars.VAR_TASCA_DELEGACIO);
 	}

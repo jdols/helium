@@ -12,6 +12,17 @@ import java.util.Map;
 
 import javax.annotation.Resource;
 
+import org.apache.commons.lang.StringUtils;
+import org.jbpm.graph.exe.ProcessInstanceExpedient;
+import org.jbpm.jpdl.el.ELException;
+import org.jbpm.jpdl.el.ExpressionEvaluator;
+import org.jbpm.jpdl.el.VariableResolver;
+import org.jbpm.jpdl.el.impl.ExpressionEvaluatorImpl;
+import org.springframework.security.acls.model.Permission;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+
 import net.conselldemallorca.helium.core.common.ExpedientIniciantDto;
 import net.conselldemallorca.helium.core.helperv26.LuceneHelper;
 import net.conselldemallorca.helium.core.helperv26.MesuresTemporalsHelper;
@@ -33,7 +44,7 @@ import net.conselldemallorca.helium.core.model.hibernate.SequenciaDefaultAny;
 import net.conselldemallorca.helium.core.security.ExtendedPermission;
 import net.conselldemallorca.helium.core.util.ExpedientCamps;
 import net.conselldemallorca.helium.core.util.GlobalProperties;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessInstance;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmToken;
 import net.conselldemallorca.helium.v3.core.api.dto.DefinicioProcesDto;
@@ -49,17 +60,6 @@ import net.conselldemallorca.helium.v3.core.repository.AlertaRepository;
 import net.conselldemallorca.helium.v3.core.repository.DefinicioProcesRepository;
 import net.conselldemallorca.helium.v3.core.repository.EstatRepository;
 import net.conselldemallorca.helium.v3.core.repository.ExpedientRepository;
-
-import org.apache.commons.lang.StringUtils;
-import org.jbpm.graph.exe.ProcessInstanceExpedient;
-import org.jbpm.jpdl.el.ELException;
-import org.jbpm.jpdl.el.ExpressionEvaluator;
-import org.jbpm.jpdl.el.VariableResolver;
-import org.jbpm.jpdl.el.impl.ExpressionEvaluatorImpl;
-import org.springframework.security.acls.model.Permission;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 
 /**
  * Helper per a gestionar els expedients.
@@ -79,7 +79,7 @@ public class ExpedientHelper {
 	@Resource(name = "permisosHelperV3")
 	private PermisosHelper permisosHelper;
 	@Resource
-	private JbpmHelper jbpmHelper;
+	private WorkflowEngineApi workflowEngineApi;
 	@Resource
 	private ExpedientRegistreHelper expedientRegistreHelper;
 	@Resource
@@ -554,13 +554,13 @@ public class ExpedientHelper {
 				ExpedientLogAccioTipus.EXPEDIENT_ATURAR,
 				motiu);
 		expedientLog.setEstat(ExpedientLogEstat.IGNORAR);
-		List<JbpmProcessInstance> processInstancesTree = jbpmHelper.getProcessInstanceTree(
+		List<JbpmProcessInstance> processInstancesTree = workflowEngineApi.getProcessInstanceTree(
 				expedient.getProcessInstanceId());
 		String[] ids = new String[processInstancesTree.size()];
 		int i = 0;
 		for (JbpmProcessInstance pi: processInstancesTree)
 			ids[i++] = pi.getId();
-		jbpmHelper.suspendProcessInstances(ids);
+		workflowEngineApi.suspendProcessInstances(ids);
 		expedient.setInfoAturat(motiu);
 		expedientRegistreHelper.crearRegistreAturarExpedient(
 				expedient.getId(),
@@ -583,13 +583,13 @@ public class ExpedientHelper {
 				ExpedientLogAccioTipus.EXPEDIENT_REPRENDRE,
 				null);
 		expedientLog.setEstat(ExpedientLogEstat.IGNORAR);
-		List<JbpmProcessInstance> processInstancesTree = jbpmHelper.getProcessInstanceTree(
+		List<JbpmProcessInstance> processInstancesTree = workflowEngineApi.getProcessInstanceTree(
 				expedient.getProcessInstanceId());
 		String[] ids = new String[processInstancesTree.size()];
 		int i = 0;
 		for (JbpmProcessInstance pi: processInstancesTree)
 			ids[i++] = pi.getId();
-		jbpmHelper.resumeProcessInstances(ids);
+		workflowEngineApi.resumeProcessInstances(ids);
 		expedient.setInfoAturat(null);
 		expedientRegistreHelper.crearRegistreReprendreExpedient(
 				expedient.getId(),
@@ -632,11 +632,11 @@ public class ExpedientHelper {
 			String tokenId,
 			String nodeName,
 			boolean cancelTasks) {
-		JbpmToken token = jbpmHelper.getTokenById(tokenId);
+		JbpmToken token = workflowEngineApi.getTokenById(tokenId);
 		String nodeNameVell = token.getNodeName();
-		ProcessInstanceExpedient piexp = jbpmHelper.expedientFindByProcessInstanceId(
+		ProcessInstanceExpedient piexp = workflowEngineApi.expedientFindByProcessInstanceId(
 				token.getProcessInstanceId());
-		jbpmHelper.tokenRedirect(
+		workflowEngineApi.tokenRedirect(
 				new Long(tokenId).longValue(),
 				nodeName,
 				cancelTasks,
@@ -654,7 +654,7 @@ public class ExpedientHelper {
 	public ProcessInstanceExpedient comprovarInstanciaProces(
 			Expedient expedient,
 			String processInstanceId) {
-		ProcessInstanceExpedient piexp = jbpmHelper.expedientFindByProcessInstanceId(
+		ProcessInstanceExpedient piexp = workflowEngineApi.expedientFindByProcessInstanceId(
 				processInstanceId);
 		if (piexp.getId() != expedient.getId().longValue()) {
 			throw new NoTrobatException(
@@ -670,7 +670,7 @@ public class ExpedientHelper {
 	
 	public Expedient findExpedientByProcessInstanceId(String processInstanceId) {
 		Expedient expedient = null;
-		ProcessInstanceExpedient piexp = jbpmHelper.expedientFindByProcessInstanceId(
+		ProcessInstanceExpedient piexp = workflowEngineApi.expedientFindByProcessInstanceId(
 				processInstanceId);
 		if (piexp != null)
 			expedient = expedientRepository.findOne(piexp.getId());
@@ -686,7 +686,7 @@ public class ExpedientHelper {
 	}
 	public DefinicioProces findDefinicioProcesByProcessInstanceId(
 			String processInstanceId) {
-		String processDefinitionId = jbpmHelper.getProcessInstance(processInstanceId).getProcessDefinitionId();
+		String processDefinitionId = workflowEngineApi.getProcessInstance(processInstanceId).getProcessDefinitionId();
 		DefinicioProces definicioProces = definicioProcesRepository.findByJbpmId(processDefinitionId);
 		if (definicioProces == null) {
 			throw new NoTrobatException(
@@ -810,8 +810,8 @@ public class ExpedientHelper {
 	public List<InstanciaProcesDto> getArbreInstanciesProces(
 			String processInstanceId) {
 		List<InstanciaProcesDto> resposta = new ArrayList<InstanciaProcesDto>();
-		JbpmProcessInstance rootProcessInstance = jbpmHelper.getRootProcessInstance(processInstanceId);
-		List<JbpmProcessInstance> piTree = jbpmHelper.getProcessInstanceTree(rootProcessInstance.getId());
+		JbpmProcessInstance rootProcessInstance = workflowEngineApi.getRootProcessInstance(processInstanceId);
+		List<JbpmProcessInstance> piTree = workflowEngineApi.getProcessInstanceTree(rootProcessInstance.getId());
 		for (JbpmProcessInstance jpi: piTree) {
 			resposta.add(getInstanciaProcesById(jpi.getId()));
 		}
@@ -820,7 +820,7 @@ public class ExpedientHelper {
 	public InstanciaProcesDto getInstanciaProcesById(String processInstanceId) {
 		InstanciaProcesDto dto = new InstanciaProcesDto();
 		dto.setId(processInstanceId);
-		JbpmProcessInstance pi = jbpmHelper.getProcessInstance(processInstanceId);
+		JbpmProcessInstance pi = workflowEngineApi.getProcessInstance(processInstanceId);
 		if (pi.getProcessInstance() == null)
 			return null;
 		dto.setInstanciaProcesPareId(pi.getParentProcessInstanceId());

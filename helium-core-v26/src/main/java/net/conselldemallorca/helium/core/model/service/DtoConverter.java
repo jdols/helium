@@ -12,6 +12,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.hibernate.Hibernate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
+import org.springframework.stereotype.Service;
+
+import com.codahale.metrics.MetricRegistry;
+
 import net.conselldemallorca.helium.core.common.JbpmVars;
 import net.conselldemallorca.helium.core.extern.domini.FilaResultat;
 import net.conselldemallorca.helium.core.extern.domini.ParellaCodiValor;
@@ -57,22 +66,13 @@ import net.conselldemallorca.helium.core.model.hibernate.FirmaTasca;
 import net.conselldemallorca.helium.core.model.hibernate.Tasca;
 import net.conselldemallorca.helium.core.security.AclServiceDao;
 import net.conselldemallorca.helium.core.util.GlobalProperties;
+import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.handlers.BasicActionHandler;
 import net.conselldemallorca.helium.jbpm3.integracio.DelegationInfo;
 import net.conselldemallorca.helium.jbpm3.integracio.DominiCodiDescripcio;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmHelper;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessDefinition;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessInstance;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmTask;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.hibernate.Hibernate;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.MessageSource;
-import org.springframework.stereotype.Service;
-
-import com.codahale.metrics.MetricRegistry;
 
 
 /**
@@ -92,7 +92,7 @@ public class DtoConverter {
 	private TascaDao tascaDao;
 	private DefinicioProcesDao definicioProcesDao;
 	private PluginPersonaDao pluginPersonaDao;
-	private JbpmHelper jbpmDao;
+	private WorkflowEngineApi workflowEngineApi;
 	private EnumeracioValorsDao enumeracioValorsDao;
 	private LuceneDao luceneDao;
 	private CampDao campDao;
@@ -158,7 +158,7 @@ public class DtoConverter {
 		dto.setTramitExpedientClau(expedient.getTramitExpedientClau());
 		dto.setErrorsIntegracions(expedient.isErrorsIntegracions());
 		if (!starting) {
-			JbpmProcessInstance processInstance = jbpmDao.getProcessInstance(expedient.getProcessInstanceId());
+			JbpmProcessInstance processInstance = workflowEngineApi.getProcessInstance(expedient.getProcessInstanceId());
 			dto.setDataFi(processInstance.getEnd());
 			
 			// Actualizamos la fecha de fin
@@ -199,8 +199,8 @@ public class DtoConverter {
 			titol = tasca.getNom();
 			if (tasca.getNomScript() != null && tasca.getNomScript().length() > 0) {
 				List<String> campsExpressio = getCampsExpressioTitol(tasca.getNomScript());
-				Map<String, Object> valors = jbpmDao.getTaskInstanceVariables(task.getId());
-				valors.putAll(jbpmDao.getProcessInstanceVariables(task.getProcessInstanceId()));
+				Map<String, Object> valors = workflowEngineApi.getTaskInstanceVariables(task.getId());
+				valors.putAll(workflowEngineApi.getProcessInstanceVariables(task.getProcessInstanceId()));
 				for (String campCodi: campsExpressio) {
 					Set<Camp> campsDefinicioProces = tasca.getDefinicioProces().getCamps();
 					for (Camp camp: campsDefinicioProces) {
@@ -217,7 +217,7 @@ public class DtoConverter {
 					}
 				}
 				try {
-					titol = (String)jbpmDao.evaluateExpression(
+					titol = (String)workflowEngineApi.evaluateExpression(
 							task.getId(),
 							task.getProcessInstanceId(),
 							tasca.getNomScript(),
@@ -262,9 +262,9 @@ public class DtoConverter {
 		dto.setAgafada(task.isAgafada());
 		dto.setExpedient(
 				expedientDao.findAmbProcessInstanceId(
-						jbpmDao.getRootProcessInstance(task.getProcessInstanceId()).getId()));
-		dto.setOutcomes(jbpmDao.findTaskInstanceOutcomes(task.getId()));
-		DelegationInfo delegationInfo = (DelegationInfo)jbpmDao.getTaskInstanceVariable(
+						workflowEngineApi.getRootProcessInstance(task.getProcessInstanceId()).getId()));
+		dto.setOutcomes(workflowEngineApi.findTaskInstanceOutcomes(task.getId()));
+		DelegationInfo delegationInfo = (DelegationInfo)workflowEngineApi.getTaskInstanceVariable(
 				task.getId(),
 				TascaService.VAR_TASCA_DELEGACIO);
 		if (delegationInfo != null) {
@@ -275,10 +275,10 @@ public class DtoConverter {
 			dto.setDelegacioSupervisada(delegationInfo.isSupervised());
 			dto.setDelegacioComentari(delegationInfo.getComment());
 			if (original) {
-				JbpmTask tascaDelegacio = jbpmDao.getTaskById(delegationInfo.getTargetTaskId());
+				JbpmTask tascaDelegacio = workflowEngineApi.getTaskById(delegationInfo.getTargetTaskId());
 				dto.setDelegacioPersona(pluginPersonaDao.findAmbCodiPlugin(tascaDelegacio.getAssignee()));
 			} else {
-				JbpmTask tascaDelegacio = jbpmDao.getTaskById(delegationInfo.getSourceTaskId());
+				JbpmTask tascaDelegacio = workflowEngineApi.getTaskById(delegationInfo.getSourceTaskId());
 				dto.setDelegacioPersona(pluginPersonaDao.findAmbCodiPlugin(tascaDelegacio.getAssignee()));
 			}
 		}
@@ -311,7 +311,7 @@ public class DtoConverter {
 			List<FirmaTasca> signaturesTasca = firmaTascaDao.findAmbTascaOrdenats(tasca.getId());
 			dto.setSignatures(signaturesTasca);
 			if (ambVariables) {
-				Map<String, Object> valors = jbpmDao.getTaskInstanceVariables(task.getId());
+				Map<String, Object> valors = workflowEngineApi.getTaskInstanceVariables(task.getId());
 				
 //		Aquesta funcionalitat s'ha llevat p.o. de la DGTIC en conversa amb en Andreu Font, el 17/10/2012
 //				
@@ -382,7 +382,7 @@ public class DtoConverter {
 		dto.setDocumentsComplet(false);
 		dto.setSignaturesComplet(false);
 		dto.setDefinicioProces(tasca.getDefinicioProces());
-		dto.setOutcomes(jbpmDao.findStartTaskOutcomes(jbpmId, startTaskName));
+		dto.setOutcomes(workflowEngineApi.findStartTaskOutcomes(jbpmId, startTaskName));
 		dto.setValidacions(tasca.getValidacions());
 		dto.setFormExtern(tasca.getFormExtern());
 		//Camps
@@ -425,13 +425,13 @@ public class DtoConverter {
 		return toInstanciaProcesDto(processInstanceId , ambImatgeProces, ambVariables, ambDocuments, null, null);
 	}
 	public InstanciaProcesDto toInstanciaProcesDto(String processInstanceId , boolean ambImatgeProces, boolean ambVariables, boolean ambDocuments, String varRegistre, Object[] valorsRegistre) {
-		JbpmProcessInstance pi = jbpmDao.getProcessInstance(processInstanceId);
-		JbpmProcessDefinition jpd = jbpmDao.findProcessDefinitionWithProcessInstanceId(processInstanceId);
+		JbpmProcessInstance pi = workflowEngineApi.getProcessInstance(processInstanceId);
+		JbpmProcessDefinition jpd = workflowEngineApi.findProcessDefinitionWithProcessInstanceId(processInstanceId);
 		DefinicioProces definicioProces = definicioProcesDao.findAmbJbpmId(jpd.getId());
 		InstanciaProcesDto dto = new InstanciaProcesDto();
 		dto.setId(processInstanceId);
 		dto.setInstanciaProcesPareId(pi.getParentProcessInstanceId());
-		JbpmProcessInstance jpi = jbpmDao.getRootProcessInstance(processInstanceId);
+		JbpmProcessInstance jpi = workflowEngineApi.getRootProcessInstance(processInstanceId);
 		dto.setExpedient(expedientDao.findAmbProcessInstanceId(jpi.getId()));
 		dto.setDefinicioProces(definicioProces);
 		if (pi.getDescription() != null && pi.getDescription().length() > 0)
@@ -439,14 +439,14 @@ public class DtoConverter {
 		dto.setDataInici(pi.getStart());
 		dto.setDataFi(pi.getEnd());
 		if (ambImatgeProces) {
-			Set<String> resourceNames = jbpmDao.getResourceNames(jpd.getId());
+			Set<String> resourceNames = workflowEngineApi.getResourceNames(jpd.getId());
 			dto.setImatgeDisponible(resourceNames.contains("processimage.jpg"));
 		}
 		Set<Camp> camps = definicioProces.getCamps();
 		dto.setCamps(camps);
 		List<Document> documents = new ArrayList<Document>();
 		if (ambDocuments) {
-			Map<String, Object> valors = jbpmDao.getProcessInstanceVariables(processInstanceId);
+			Map<String, Object> valors = workflowEngineApi.getProcessInstanceVariables(processInstanceId);
 			documents = documentDao.findAmbDefinicioProces(definicioProces.getId());
 			dto.setDocuments(documents);
 			dto.setVarsDocuments(obtenirVarsDocumentsProces(
@@ -456,7 +456,7 @@ public class DtoConverter {
 		}
 		dto.setAgrupacions(campAgrupacioDao.findAmbDefinicioProcesOrdenats(definicioProces.getId()));
 		if (ambVariables) {
-			Map<String, Object> valors = jbpmDao.getProcessInstanceVariables(processInstanceId);
+			Map<String, Object> valors = workflowEngineApi.getProcessInstanceVariables(processInstanceId);
 			if (valors == null)
 				valors = new HashMap<String, Object>();
 			if (varRegistre != null) 
@@ -813,8 +813,8 @@ public class DtoConverter {
 		this.luceneDao = luceneDao;
 	}
 	@Autowired
-	public void setJbpmHelper(JbpmHelper jbpmDao) {
-		this.jbpmDao = jbpmDao;
+	public void setWorkflowEngineApi(WorkflowEngineApi workflowEngineApi) {
+		this.workflowEngineApi = workflowEngineApi;
 	}
 	@Autowired
 	public void setEnumeracioValorsDao(EnumeracioValorsDao enumeracioValorsDao) {
@@ -1019,22 +1019,6 @@ public class DtoConverter {
 					}
 				}
 			}
-			/*if (isOptimitzarConsultesDomini() && actualitzarJbpm && valor != null && resposta != null) {
-				// Per evitar fer consultes de domini innecessàries
-				String[] valorPerGuardar = new String[] {
-						resposta.getCodi(),
-						resposta.getValor().toString()};
-				if (taskId != null)
-					jbpmDao.setTaskInstanceVariable(
-							taskId,
-							camp.getCodi(),
-							valorPerGuardar);
-				else if (processInstanceId != null)
-					jbpmDao.setProcessInstanceVariable(
-							processInstanceId,
-							camp.getCodi(),
-							valorPerGuardar);
-			}*/
 		}
 		return resposta;
 	}
@@ -1316,10 +1300,10 @@ public class DtoConverter {
 				value = (String)GlobalProperties.getInstance().get(campCodi.substring(1));
 			} else if (campCodi.startsWith("#{")) {
 				if (processInstanceId != null) {
-					value = jbpmDao.evaluateExpression(taskId, processInstanceId, campCodi, null);
+					value = workflowEngineApi.evaluateExpression(taskId, processInstanceId, campCodi, null);
 				} else if (taskId != null) {
-					JbpmTask task = jbpmDao.getTaskById(taskId);
-					value = jbpmDao.evaluateExpression(taskId, task.getProcessInstanceId(), campCodi, null);
+					JbpmTask task = workflowEngineApi.getTaskById(taskId);
+					value = workflowEngineApi.evaluateExpression(taskId, task.getProcessInstanceId(), campCodi, null);
 				} else if (campCodi.startsWith("#{'")) {
 					int index = campCodi.lastIndexOf("'");
 					if (index != -1 && index > 2)
@@ -1359,7 +1343,7 @@ public class DtoConverter {
 					consultaCampDao,
 					luceneDao,
 					this,
-					jbpmDao,
+					workflowEngineApi,
 					aclServiceDao,
 					messageSource,
 					metricRegistry);
