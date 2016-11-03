@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 
 import com.codahale.metrics.MetricRegistry;
 
+import net.conselldemallorca.helium.core.api.Deployment;
 import net.conselldemallorca.helium.core.extern.domini.FilaResultat;
 import net.conselldemallorca.helium.core.helper.DominiHelper;
 import net.conselldemallorca.helium.core.model.dao.AccioDao;
@@ -169,7 +170,7 @@ public class DissenyService {
 			byte[] contingut,
 			String etiqueta,
 			boolean copiarDades) {
-		JbpmProcessDefinition dpd = workflowEngineApi.desplegar(nomArxiu, contingut);
+		Deployment dpd = workflowEngineApi.desplegar(nomArxiu, contingut);
 		if (dpd != null) {
 			DefinicioProces darrera = definicioProcesDao.findDarreraVersioAmbEntornIJbpmKey(
 					entornId,

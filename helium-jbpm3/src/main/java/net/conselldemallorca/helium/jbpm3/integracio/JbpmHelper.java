@@ -45,6 +45,7 @@ import org.jbpm.taskmgmt.exe.TaskInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import net.conselldemallorca.helium.core.api.Deployment;
 import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.command.AddProcessInstanceMessageLogCommand;
 import net.conselldemallorca.helium.jbpm3.command.AddTaskInstanceMessageLogCommand;
@@ -362,10 +363,10 @@ public class JbpmHelper implements WorkflowEngineApi {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public List<String> getTaskNamesFromDeployedProcessDefinition(JbpmProcessDefinition dpd) {
+	public List<String> getTaskNamesFromDeployedProcessDefinition(Deployment dpd) {
 		//adminService.mesuraIniciar("jBPM getTaskNamesFromDeployedProcessDefinition", "jbpmDao");
 		List<String> taskNames = new ArrayList<String>();
-		ProcessDefinition pd = dpd.getProcessDefinition();
+		ProcessDefinition pd = (ProcessDefinition)dpd.getProcessDefinition();
 		Map<String,Object> tasks = pd.getTaskMgmtDefinition().getTasks();
 		if (tasks != null) {
 			taskNames.addAll(tasks.keySet());

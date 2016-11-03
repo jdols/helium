@@ -5,6 +5,8 @@ package net.conselldemallorca.helium.jbpm3.integracio;
 
 import org.jbpm.graph.def.ProcessDefinition;
 
+import net.conselldemallorca.helium.core.api.Deployment;
+
 
 
 /**
@@ -12,7 +14,7 @@ import org.jbpm.graph.def.ProcessDefinition;
  * 
  * @author Limit Tecnologies <limit@limit.es>
  */
-public class JbpmProcessDefinition {
+public class JbpmProcessDefinition implements Deployment {
 
 	private ProcessDefinition processDefinition;
 

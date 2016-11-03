@@ -12,6 +12,7 @@ import org.jbpm.graph.exe.Token;
 import org.jbpm.job.Timer;
 import org.jbpm.logging.log.ProcessLog;
 
+import net.conselldemallorca.helium.core.api.Deployment;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessDefinition;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessInstance;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmTask;
@@ -32,7 +33,42 @@ public interface WorkflowEngineApi {
 	////////////////////////////////////////////////////////////////////////////////
 	
 	// Desplegaments
-	public JbpmProcessDefinition desplegar(String nomArxiu, byte[] contingut);
+	public Deployment desplegar(String nomArxiu, byte[] contingut);
+	
+	/*
+	 * 
+	 * JbpmProcessDefinition.getId()
+	 * JbpmProcessDefinition.getKey()
+	 * JbpmProcessDefinition.getVersion()
+	 * JbpmProcessDefinition.getProcessDefinition()
+		| V3
+		|
+		| V2.6
+		|- DissenyService
+		|		- deploy		=> 
+	deploy(Long, Long, String, byte[], String, boolean) : DefinicioProces - net.conselldemallorca.helium.core.model.service.DissenyService
+		exportForm(HttpServletRequest, String, MultipartFile, DeployCommand, BindingResult, SessionStatus, ModelMap) : String - net.conselldemallorca.helium.webapp.mvc.DefinicioProcesDeployController
+		exportForm(HttpServletRequest, String, MultipartFile, DeployCommand, BindingResult, SessionStatus, ModelMap) : String - net.conselldemallorca.helium.webapp.mvc.ExpedientTipusDeployController
+		importar(Long, Long, DefinicioProcesExportacio, String) : void - net.conselldemallorca.helium.core.model.service.DissenyService
+			exportForm(HttpServletRequest, String, MultipartFile, DeployCommand, BindingResult, SessionStatus, ModelMap) : String - net.conselldemallorca.helium.webapp.mvc.DefinicioProcesDeployController
+			exportForm(HttpServletRequest, String, MultipartFile, DeployCommand, BindingResult, SessionStatus, ModelMap) : String - net.conselldemallorca.helium.webapp.mvc.ExpedientTipusDeployController
+			importarExpedientTipus(Long, Long, ExpedientTipusExportacio) : void - net.conselldemallorca.helium.core.model.service.DissenyService
+				exportForm(HttpServletRequest, String, MultipartFile, DeployCommand, BindingResult, SessionStatus, ModelMap) : String - net.conselldemallorca.helium.webapp.mvc.DefinicioProcesDeployController
+				importar(HttpServletRequest, String, MultipartFile, Long) : String - net.conselldemallorca.helium.webapp.mvc.ExpedientTipusController
+	importar(Long, Long, DefinicioProcesExportacio, DefinicioProcesExportacioCommandDto, boolean) : DefinicioProces - net.conselldemallorca.helium.core.helper.DefinicioProcesHelper
+		importar(Long, Long, ExpedientTipusExportacioCommandDto, ExpedientTipusExportacio) : ExpedientTipusDto - net.conselldemallorca.helium.v3.core.service.ExpedientTipusServiceImpl
+			importar(Long, Long, ExpedientTipusExportacioCommandDto, ExpedientTipusExportacio) : ExpedientTipusDto - net.conselldemallorca.helium.v3.core.ejb.ExpedientTipusServiceBean
+				importar(Long, Long, ExpedientTipusExportacioCommandDto, ExpedientTipusExportacio) : ExpedientTipusDto - net.conselldemallorca.helium.v3.core.ejb.ExpedientTipusServiceBean
+				importarPost(HttpServletRequest, ExpedientTipusExportarCommand, BindingResult, Model) : String - net.conselldemallorca.helium.webapp.v3.controller.ExpedientTipusController
+			importarPost(HttpServletRequest, ExpedientTipusExportarCommand, BindingResult, Model) : String - net.conselldemallorca.helium.webapp.v3.controller.ExpedientTipusController
+		importar(Long, Long, Long, DefinicioProcesExportacioCommandDto, DefinicioProcesExportacio) : DefinicioProcesDto - net.conselldemallorca.helium.v3.core.service.DefinicioProcesServiceImpl
+			desplegarPost(HttpServletRequest, DefinicioProcesDesplegarCommand, BindingResult, Model) : String - net.conselldemallorca.helium.webapp.v3.controller.DefinicioProcesController
+			importar(Long, Long, Long, DefinicioProcesExportacioCommandDto, DefinicioProcesExportacio) : DefinicioProcesDto - net.conselldemallorca.helium.v3.core.ejb.DefinicioProcesBean
+				desplegarPost(HttpServletRequest, DefinicioProcesDesplegarCommand, BindingResult, Model) : String - net.conselldemallorca.helium.webapp.v3.controller.DefinicioProcesController
+				importar(Long, Long, Long, DefinicioProcesExportacioCommandDto, DefinicioProcesExportacio) : DefinicioProcesDto - net.conselldemallorca.helium.v3.core.ejb.DefinicioProcesBean
+				importarPost(HttpServletRequest, DefinicioProcesExportarCommand, BindingResult, Model) : String - net.conselldemallorca.helium.webapp.v3.controller.DefinicioProcesController
+			importarPost(HttpServletRequest, DefinicioProcesExportarCommand, BindingResult, Model) : String - net.conselldemallorca.helium.webapp.v3.controller.DefinicioProcesController
+	 */
 	public void esborrarDesplegament(String jbpmId);
 	public Set<String> getResourceNames(String jbpmId);
 	public byte[] getResourceBytes(String jbpmId, String resourceName);
@@ -41,7 +77,7 @@ public interface WorkflowEngineApi {
 	// Process Definitions
 	public JbpmProcessDefinition getProcessDefinition(String jbpmId);
 	public List<JbpmProcessDefinition> getSubProcessDefinitions(String jbpmId);
-	public List<String> getTaskNamesFromDeployedProcessDefinition(JbpmProcessDefinition dpd);
+	public List<String> getTaskNamesFromDeployedProcessDefinition(Deployment dpd);
 	public String getStartTaskName(String jbpmId);
 	public JbpmProcessDefinition findProcessDefinitionWithProcessInstanceId(String processInstanceId);
 		
