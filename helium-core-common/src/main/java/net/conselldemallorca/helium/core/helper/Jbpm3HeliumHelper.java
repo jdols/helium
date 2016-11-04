@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.codahale.metrics.MetricRegistry;
 
+import net.conselldemallorca.helium.core.api.WProcessDefinition;
 import net.conselldemallorca.helium.core.common.ExpedientIniciantDto;
 import net.conselldemallorca.helium.core.extern.domini.FilaResultat;
 import net.conselldemallorca.helium.core.extern.domini.ParellaCodiValor;
@@ -53,7 +54,6 @@ import net.conselldemallorca.helium.integracio.plugins.registre.RespostaAnotacio
 import net.conselldemallorca.helium.integracio.plugins.registre.RespostaJustificantDetallRecepcio;
 import net.conselldemallorca.helium.integracio.plugins.registre.RespostaJustificantRecepcio;
 import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessDefinition;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessInstance;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmTask;
 import net.conselldemallorca.helium.v3.core.api.dto.AreaDto;
@@ -1949,7 +1949,7 @@ public class Jbpm3HeliumHelper implements Jbpm3HeliumService {
 	public List<DefinicioProcesDto> findSubDefinicionsProces(Long definicioProcesId) {
 		List<DefinicioProcesDto> resposta = new ArrayList<DefinicioProcesDto>();
 		DefinicioProces definicioProces = definicioProcesRepository.findById(definicioProcesId);
-		for (JbpmProcessDefinition pd : workflowEngineApi.getSubProcessDefinitions(definicioProces.getJbpmId())) {
+		for (WProcessDefinition pd : workflowEngineApi.getSubProcessDefinitions(null, definicioProces.getJbpmId())) {
 			resposta.add(conversioTipusHelper.convertir(
 					definicioProcesRepository.findByJbpmId(pd.getId()),
 					DefinicioProcesDto.class));

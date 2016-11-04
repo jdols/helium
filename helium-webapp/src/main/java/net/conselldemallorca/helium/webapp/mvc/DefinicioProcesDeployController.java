@@ -151,7 +151,7 @@ public class DefinicioProcesDeployController extends BaseController {
 		        	try {
 		        		if (command.getTipus().equals(TIPUS_EXPORTACIO_JBPM)) {
 		        			if (JBPM_DESPLEGAR.equals(command.getAccioJbpm())) {
-			        			DefinicioProces dp = dissenyService.deploy(
+			        			List<DefinicioProces> dps = dissenyService.deploy(
 					        			entorn.getId(),
 					        			command.getExpedientTipusId(),
 					        			multipartFile.getOriginalFilename(),
@@ -159,34 +159,26 @@ public class DefinicioProcesDeployController extends BaseController {
 					        			command.getEtiqueta(),
 					        			true);
 					        	missatgeInfo(request, getMessage("info.arxiu.desplegat"));
-//					        	if (command.getExpedientTipusId() != null && command.isActualitzarProcessosActius()) {
 					        	if (command.isActualitzarProcessosActius()) {
 					        		try {
-//						        		expedientService.actualitzarProcessInstancesADarreraVersio(
-//						        				dp.getJbpmKey());
-//						        		missatgeInfo(request, getMessage("info.arxiu.desplegat.actualitzat"));
-						        		
-						        		// Obtenim informació de l'execució massiva
-						    			
-					    				ExecucioMassivaDto dto = new ExecucioMassivaDto();
-					    				dto.setDataInici(new Date());
-					    				dto.setEnviarCorreu(false);
-					    				dto.setParam1(dp.getJbpmKey());
-					    				dto.setParam2(execucioMassivaService.serialize(Integer.valueOf(dp.getVersio())));
-//					    				dto.setExpedientTipusId(command.getExpedientTipusId());
-					    				dto.setTipus(ExecucioMassivaTipus.ACTUALITZAR_VERSIO_DEFPROC);
-					    				List<JbpmProcessInstance> procInstances = expedientService.findProcessInstancesWithProcessDefinitionNameAndEntorn(dp.getJbpmKey(), entorn.getId());
-					    				List<String> pi_ids = new ArrayList<String>();
-//					    				List<Long> exp_ids = new ArrayList<Long>();
-					    				for (JbpmProcessInstance pi: procInstances) {
-					    					pi_ids.add(pi.getId());
-//					    					exp_ids.add(expedientService.findExpedientAmbProcessInstanceId(pi.getId()).getId());
-					    				}
-//					    				dto.setExpedientIds(exp_ids);
-					    				dto.setProcInstIds(pi_ids);
-					    				execucioMassivaService.crearExecucioMassiva(dto);
-					    				
-					    				missatgeInfo(request, getMessage("info.canvi.versio.massiu", new Object[] {pi_ids.size()}));
+					        			for (DefinicioProces dp: dps) {
+							        		// Obtenim informació de l'execució massiva
+						    				ExecucioMassivaDto dto = new ExecucioMassivaDto();
+						    				dto.setDataInici(new Date());
+						    				dto.setEnviarCorreu(false);
+						    				dto.setParam1(dp.getJbpmKey());
+						    				dto.setParam2(execucioMassivaService.serialize(Integer.valueOf(dp.getVersio())));
+						    				dto.setTipus(ExecucioMassivaTipus.ACTUALITZAR_VERSIO_DEFPROC);
+						    				List<JbpmProcessInstance> procInstances = expedientService.findProcessInstancesWithProcessDefinitionNameAndEntorn(dp.getJbpmKey(), entorn.getId());
+						    				List<String> pi_ids = new ArrayList<String>();
+						    				for (JbpmProcessInstance pi: procInstances) {
+						    					pi_ids.add(pi.getId());
+						    				}
+						    				dto.setProcInstIds(pi_ids);
+						    				execucioMassivaService.crearExecucioMassiva(dto);
+						    				
+						    				missatgeInfo(request, getMessage("info.canvi.versio.massiu", new Object[] {pi_ids.size()}));
+					        			}
 					    			} catch (Exception e) {
 					    				missatgeError(request, getMessage("error.no.massiu"));
 					    				logger.error("Error al programar les actualitzacions de versió de procés", e);

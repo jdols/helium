@@ -19,7 +19,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import net.conselldemallorca.helium.core.api.Deployment;
+import net.conselldemallorca.helium.core.api.WDeployment;
+import net.conselldemallorca.helium.core.api.WProcessDefinition;
 import net.conselldemallorca.helium.core.model.hibernate.Accio;
 import net.conselldemallorca.helium.core.model.hibernate.Camp;
 import net.conselldemallorca.helium.core.model.hibernate.Camp.TipusCamp;
@@ -180,20 +181,22 @@ public class DefinicioProcesHelper {
 									"exportar.validacio.definicio.desplegada.entorn", 
 									new Object[]{definicio.getJbpmKey()}));
 				}
-			Deployment dpd = workflowEngineApi.desplegar(
+			WDeployment dpd = workflowEngineApi.desplegar(
 					importacio.getNomDeploy(), 
 					importacio.getContingutDeploy());
-			if (dpd != null) {
+			if (dpd != null && dpd.getProcessDefinitions() != null && !dpd.getProcessDefinitions().isEmpty()) {
+				// En el cas de importació de definició de procés, només es desplega 1 definició de procés
+				WProcessDefinition wpd = dpd.getProcessDefinitions().get(0);
 				// Crea la nova definició de procés
 				definicio = new DefinicioProces(
-						dpd.getId(),
-						dpd.getKey(),
-						dpd.getVersion(),
+						wpd.getId(),
+						wpd.getKey(),
+						wpd.getVersion(),
 						entorn);
 				definicio.setExpedientTipus(expedientTipus);
 				definicio = definicioProcesRepository.saveAndFlush(definicio);
 				// Crea les tasques publicades
-				for (String nomTasca: workflowEngineApi.getTaskNamesFromDeployedProcessDefinition(dpd)) {
+				for (String nomTasca: workflowEngineApi.getTaskNamesFromDeployedProcessDefinition(dpd, wpd.getId())) {
 					Tasca tasca = new Tasca(
 							definicio,
 							nomTasca,

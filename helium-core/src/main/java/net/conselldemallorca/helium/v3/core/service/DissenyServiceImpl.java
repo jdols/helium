@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import edu.emory.mathcs.backport.java.util.Collections;
+import net.conselldemallorca.helium.core.api.WProcessDefinition;
 import net.conselldemallorca.helium.core.extern.domini.FilaResultat;
 import net.conselldemallorca.helium.core.extern.domini.ParellaCodiValor;
 import net.conselldemallorca.helium.core.helper.ConversioTipusHelper;
@@ -194,8 +195,8 @@ public class DissenyServiceImpl implements DissenyService {
 
 	
 	private void getAllDefinicioProcesOrderByVersio (DefinicioProcesDto definicioProcesDto) {	
-		JbpmProcessDefinition jb = workflowEngineApi.getProcessDefinition(definicioProcesDto.getJbpmId());
-		definicioProcesDto.setEtiqueta(jb.getProcessDefinition().getName()+" v."+jb.getVersion());
+		WProcessDefinition jb = workflowEngineApi.getProcessDefinition(null, definicioProcesDto.getJbpmId());
+		definicioProcesDto.setEtiqueta(jb.getName()+" v."+jb.getVersion());
 		List<DefinicioProces> mateixaKeyIEntorn = definicioProcesRepository.findByEntornIdAndJbpmKeyOrderByVersioDesc(
 				definicioProcesDto.getEntorn().getId(),
 				definicioProcesDto.getJbpmKey());
@@ -242,7 +243,7 @@ public class DissenyServiceImpl implements DissenyService {
 					expedientTipus.getEntorn().getId(),
 					expedientTipus.getJbpmProcessDefinitionKey());
 			if (definicioProces != null) {
-				JbpmProcessDefinition jb = workflowEngineApi.getProcessDefinition(definicioProces.getJbpmId());
+				WProcessDefinition jb = workflowEngineApi.getProcessDefinition(null, definicioProces.getJbpmId());
 				return getDefinicioProcesByEntornIdAmbJbpmId(
 						definicioProces.getEntorn().getId(), 
 						jb.getKey(), 
@@ -261,7 +262,7 @@ public class DissenyServiceImpl implements DissenyService {
 			Long procesId) {		
 		DefinicioProces definicioProces = definicioProcesRepository.findById(procesId);
 		if (definicioProces != null) {
-			JbpmProcessDefinition jb = workflowEngineApi.getProcessDefinition(definicioProces.getJbpmId());
+			WProcessDefinition jb = workflowEngineApi.getProcessDefinition(null, definicioProces.getJbpmId());
 			return getDefinicioProcesByEntornIdAmbJbpmId(
 					definicioProces.getEntorn().getId(), 
 					jb.getKey(), 
@@ -279,10 +280,13 @@ public class DissenyServiceImpl implements DissenyService {
 			throw new NoTrobatException(DefinicioProces.class, jbpmId);
 		
 		List<String> jbpmIds = new ArrayList<String>(); 
-		afegirJbpmIdProcesAmbSubprocessos(workflowEngineApi.getProcessDefinition(jbpmId), jbpmIds, false);
+		afegirJbpmIdProcesAmbSubprocessos(
+				workflowEngineApi.getProcessDefinition(null, jbpmId), 
+				jbpmIds, 
+				false);
 		List<DefinicioProcesExpedientDto> subprocessos = new ArrayList<DefinicioProcesExpedientDto>();
 		for(String id: jbpmIds){
-			JbpmProcessDefinition jb = workflowEngineApi.getProcessDefinition(id);
+			WProcessDefinition jb = workflowEngineApi.getProcessDefinition(null, id);
 			subprocessos.add(getDefinicioProcesByEntornIdAmbJbpmId(definicioProces.getEntorn().getId(), jb.getKey(), null));
 		}
 		return subprocessos;
@@ -292,7 +296,7 @@ public class DissenyServiceImpl implements DissenyService {
 		DefinicioProcesExpedientDto dto = new DefinicioProcesExpedientDto();
 		DefinicioProces definicioProces = definicioProcesRepository.findDarreraVersioAmbEntornIJbpmKey(entornId, jbpmKey);
 		if (definicioProces != null) {
-			JbpmProcessDefinition jb = workflowEngineApi.getProcessDefinition(definicioProces.getJbpmId());			
+			WProcessDefinition jb = workflowEngineApi.getProcessDefinition(null, definicioProces.getJbpmId());			
 			dto.setId(definicioProces.getId());
 			dto.setJbpmId(definicioProces.getJbpmId());
 			dto.setJbpmKey(definicioProces.getJbpmKey());
@@ -319,14 +323,17 @@ public class DissenyServiceImpl implements DissenyService {
 	}
 	
 	private void afegirJbpmIdProcesAmbSubprocessos(
-			JbpmProcessDefinition jpd,
+			WProcessDefinition jpd,
 			List<String> jbpmIds, 
 			Boolean incloure) {
 		if (jpd != null) {
-			List<JbpmProcessDefinition> subPds = workflowEngineApi.getSubProcessDefinitions(jpd.getId());
+			List<WProcessDefinition> subPds = workflowEngineApi.getSubProcessDefinitions(null, jpd.getId());
 			if (subPds != null) {
-				for (JbpmProcessDefinition subPd: subPds) {
-					afegirJbpmIdProcesAmbSubprocessos(subPd, jbpmIds, true);
+				for (WProcessDefinition subPd: subPds) {
+					afegirJbpmIdProcesAmbSubprocessos(
+							subPd, 
+							jbpmIds, 
+							true);
 					if (!jbpmIds.contains(subPd.getId()))
 						jbpmIds.add(subPd.getId());
 				}

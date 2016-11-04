@@ -45,7 +45,8 @@ import org.jbpm.taskmgmt.exe.TaskInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import net.conselldemallorca.helium.core.api.Deployment;
+import net.conselldemallorca.helium.core.api.WDeployment;
+import net.conselldemallorca.helium.core.api.WProcessDefinition;
 import net.conselldemallorca.helium.jbpm3.api.WorkflowEngineApi;
 import net.conselldemallorca.helium.jbpm3.command.AddProcessInstanceMessageLogCommand;
 import net.conselldemallorca.helium.jbpm3.command.AddTaskInstanceMessageLogCommand;
@@ -125,6 +126,115 @@ public class JbpmHelper implements WorkflowEngineApi {
 
 	private CommandService commandService;
 
+	@Override
+	public WDeployment desplegar(
+			String nomArxiu,
+			byte[] contingut) {
+		//adminService.mesuraIniciar("jBPM desplegar", "jbpmDao");
+		JbpmProcessDefinition resposta = null;
+		DeployProcessCommand command;
+		if (nomArxiu.endsWith(".xml")) {
+			try {
+				command = new DeployProcessCommand(new String(contingut));
+				ByteArrayOutputStream baos = new ByteArrayOutputStream();
+				ZipOutputStream zos = new ZipOutputStream(baos);
+				byte[] data = new byte[1024];
+				InputStream is = new ByteArrayInputStream(contingut);
+				zos.putNextEntry(new ZipEntry("processdefinition.xml"));
+				int count;
+				while ((count = is.read(data, 0, 1024)) != -1)
+					zos.write(data, 0, count);
+		        zos.closeEntry();
+				zos.close();
+				command = new DeployProcessCommand(baos.toByteArray());
+			} catch (Exception ex) {
+				//adminService.mesuraCalcular("jBPM desplegar", "jbpmDao");
+				throw new RuntimeException("No s'ha pogut deplegar l'arxiu", ex);
+			}
+		} else if (nomArxiu.endsWith("ar")) {
+			command = new DeployProcessCommand(contingut);
+		} else {
+			//adminService.mesuraCalcular("jBPM desplegar", "jbpmDao");
+			throw new RuntimeException("Arxiu amb extensió no suportada " + nomArxiu + ". Només es suporten les extensions .xml i .*ar");
+		}
+		ProcessDefinition processDefinition = (ProcessDefinition)commandService.execute(command);
+		resposta = new JbpmProcessDefinition(processDefinition);
+		//adminService.mesuraCalcular("jBPM desplegar", "jbpmDao");
+		return resposta;
+	}
+	
+	@Override
+	public WDeployment getDesplegament(String processDefinitionId) {
+		return (WDeployment)getProcessDefinition(null, processDefinitionId);
+	}
+	
+	@Override
+	public void esborrarDesplegament(String jbpmId) {
+		//adminService.mesuraIniciar("jBPM esborrarDesplegament", "jbpmDao");
+		DeleteProcessDefinitionCommand command = new DeleteProcessDefinitionCommand();
+		command.setId(Long.parseLong(jbpmId));
+		commandService.execute(command);
+		//adminService.mesuraCalcular("jBPM esborrarDesplegament", "jbpmDao");
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public Set<String> getResourceNames(String jbpmId) {
+		//adminService.mesuraIniciar("jBPM getResourceNames", "jbpmDao");
+		Set<String> resources = null;
+		final long pdid = Long.parseLong(jbpmId);
+		GetProcessDefinitionByIdCommand command = new GetProcessDefinitionByIdCommand(pdid);
+		ProcessDefinition processDefinition = (ProcessDefinition)commandService.execute(command);
+		if (processDefinition != null) {
+			FileDefinition fd = processDefinition.getFileDefinition();
+			if (fd != null)
+				resources = fd.getBytesMap().keySet();
+			else
+				resources = new HashSet<String>();
+		} else {
+			resources = new HashSet<String>();
+		}
+		//adminService.mesuraCalcular("jBPM getResourceNames", "jbpmDao");
+		return resources;
+	}
+
+	@Override
+	public byte[] getResourceBytes(String jbpmId, String resourceName) {
+		//adminService.mesuraIniciar("jBPM getResourceBytes", "jbpmDao");
+		final long pdid = Long.parseLong(jbpmId);
+		GetProcessDefinitionByIdCommand command = new GetProcessDefinitionByIdCommand(pdid);
+		ProcessDefinition processDefinition = (ProcessDefinition)commandService.execute(command);
+		byte[] bytes = processDefinition.getFileDefinition().getBytes(resourceName);
+		//adminService.mesuraCalcular("jBPM getResourceBytes", "jbpmDao");
+		return bytes;
+	}
+	
+	/** Actualitza els recursos .class de la definició de procés indicada amb els recursos
+	 * continguts en el jbpmProcessDefinition.
+	 * @param jbpmId Identifica la definició de procés a actualtizar.
+	 * @param jbpmProcessDefinition Conté la informació amb què actualitzar els handlers.
+	 */
+	@Override
+	public void updateHandlers (
+			Long jbpmId, 
+			Map<String, byte[]> handlers) {
+		// Omple que command que substitueix els handlers existents
+		UpdateHandlersCommand command = new UpdateHandlersCommand(
+				jbpmId,
+				handlers);
+		commandService.execute(command);
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	@SuppressWarnings("unchecked")
 	@Override
 	public ResultatConsultaPaginadaJbpm<JbpmTask> tascaFindByFiltrePaginat(
@@ -271,47 +381,10 @@ public class JbpmHelper implements WorkflowEngineApi {
 	}
 
 	@Override
-	public JbpmProcessDefinition desplegar(
-			String nomArxiu,
-			byte[] contingut) {
-		//adminService.mesuraIniciar("jBPM desplegar", "jbpmDao");
-		JbpmProcessDefinition resposta = null;
-		DeployProcessCommand command;
-		if (nomArxiu.endsWith(".xml")) {
-			try {
-				command = new DeployProcessCommand(new String(contingut));
-				ByteArrayOutputStream baos = new ByteArrayOutputStream();
-				ZipOutputStream zos = new ZipOutputStream(baos);
-				byte[] data = new byte[1024];
-				InputStream is = new ByteArrayInputStream(contingut);
-				zos.putNextEntry(new ZipEntry("processdefinition.xml"));
-				int count;
-				while ((count = is.read(data, 0, 1024)) != -1)
-					zos.write(data, 0, count);
-		        zos.closeEntry();
-				zos.close();
-				command = new DeployProcessCommand(baos.toByteArray());
-			} catch (Exception ex) {
-				//adminService.mesuraCalcular("jBPM desplegar", "jbpmDao");
-				throw new RuntimeException("No s'ha pogut deplegar l'arxiu", ex);
-			}
-		} else if (nomArxiu.endsWith("ar")) {
-			command = new DeployProcessCommand(contingut);
-		} else {
-			//adminService.mesuraCalcular("jBPM desplegar", "jbpmDao");
-			throw new RuntimeException("Arxiu amb extensió no suportada " + nomArxiu + ". Només es suporten les extensions .xml i .*ar");
-		}
-		ProcessDefinition processDefinition = (ProcessDefinition)commandService.execute(command);
-		resposta = new JbpmProcessDefinition(processDefinition);
-		//adminService.mesuraCalcular("jBPM desplegar", "jbpmDao");
-		return resposta;
-	}
-
-	@Override
-	public JbpmProcessDefinition getProcessDefinition(String jbpmId) {
+	public WProcessDefinition getProcessDefinition(String deploymentId, String processDefinitionId) {
 		//adminService.mesuraIniciar("jBPM getProcessDefinition", "jbpmDao");
 		JbpmProcessDefinition resposta = null;
-		final long pdid = Long.parseLong(jbpmId);
+		final long pdid = Long.parseLong(processDefinitionId);
 		GetProcessDefinitionByIdCommand command = new GetProcessDefinitionByIdCommand(pdid);
 		ProcessDefinition processDefinition = (ProcessDefinition)commandService.execute(command);
 		if (processDefinition != null)
@@ -322,10 +395,10 @@ public class JbpmHelper implements WorkflowEngineApi {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public List<JbpmProcessDefinition> getSubProcessDefinitions(String jbpmId) {
+	public List<WProcessDefinition> getSubProcessDefinitions(String deploymentId, String processDefinitionId) {
 		//adminService.mesuraIniciar("jBPM getSubProcessDefinitions", "jbpmDao");
-		List<JbpmProcessDefinition> resposta = new ArrayList<JbpmProcessDefinition>();
-		final long pdid = Long.parseLong(jbpmId);
+		List<WProcessDefinition> resposta = new ArrayList<WProcessDefinition>();
+		final long pdid = Long.parseLong(processDefinitionId);
 		GetSubProcessDefinitionsCommand command = new GetSubProcessDefinitionsCommand(pdid);
 		for (ProcessDefinition pd: (List<ProcessDefinition>)commandService.execute(command)) {
 			resposta.add(new JbpmProcessDefinition(pd));
@@ -363,10 +436,11 @@ public class JbpmHelper implements WorkflowEngineApi {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public List<String> getTaskNamesFromDeployedProcessDefinition(Deployment dpd) {
+	public List<String> getTaskNamesFromDeployedProcessDefinition(WDeployment dpd, String processDefinitionId) {
 		//adminService.mesuraIniciar("jBPM getTaskNamesFromDeployedProcessDefinition", "jbpmDao");
 		List<String> taskNames = new ArrayList<String>();
-		ProcessDefinition pd = (ProcessDefinition)dpd.getProcessDefinition();
+		// En el JBPM3 un desplegament únicament pot contenir una definició de procés
+		ProcessDefinition pd = (ProcessDefinition)dpd.getProcessDefinitions().get(0);
 		Map<String,Object> tasks = pd.getTaskMgmtDefinition().getTasks();
 		if (tasks != null) {
 			taskNames.addAll(tasks.keySet());
@@ -377,49 +451,9 @@ public class JbpmHelper implements WorkflowEngineApi {
 		if (startTask != null && !taskNames.contains(startTask.getName())) {
 			taskNames.add(startTask.getName());
 		}
+		
 		//adminService.mesuraCalcular("jBPM getTaskNamesFromDeployedProcessDefinition", "jbpmDao");
 		return taskNames;
-	}
-
-	@Override
-	public void esborrarDesplegament(String jbpmId) {
-		//adminService.mesuraIniciar("jBPM esborrarDesplegament", "jbpmDao");
-		DeleteProcessDefinitionCommand command = new DeleteProcessDefinitionCommand();
-		command.setId(Long.parseLong(jbpmId));
-		commandService.execute(command);
-		//adminService.mesuraCalcular("jBPM esborrarDesplegament", "jbpmDao");
-	}
-
-	@SuppressWarnings("unchecked")
-	@Override
-	public Set<String> getResourceNames(String jbpmId) {
-		//adminService.mesuraIniciar("jBPM getResourceNames", "jbpmDao");
-		Set<String> resources = null;
-		final long pdid = Long.parseLong(jbpmId);
-		GetProcessDefinitionByIdCommand command = new GetProcessDefinitionByIdCommand(pdid);
-		ProcessDefinition processDefinition = (ProcessDefinition)commandService.execute(command);
-		if (processDefinition != null) {
-			FileDefinition fd = processDefinition.getFileDefinition();
-			if (fd != null)
-				resources = fd.getBytesMap().keySet();
-			else
-				resources = new HashSet<String>();
-		} else {
-			resources = new HashSet<String>();
-		}
-		//adminService.mesuraCalcular("jBPM getResourceNames", "jbpmDao");
-		return resources;
-	}
-
-	@Override
-	public byte[] getResourceBytes(String jbpmId, String resourceName) {
-		//adminService.mesuraIniciar("jBPM getResourceBytes", "jbpmDao");
-		final long pdid = Long.parseLong(jbpmId);
-		GetProcessDefinitionByIdCommand command = new GetProcessDefinitionByIdCommand(pdid);
-		ProcessDefinition processDefinition = (ProcessDefinition)commandService.execute(command);
-		byte[] bytes = processDefinition.getFileDefinition().getBytes(resourceName);
-		//adminService.mesuraCalcular("jBPM getResourceBytes", "jbpmDao");
-		return bytes;
 	}
 
 	@Override
@@ -1864,22 +1898,6 @@ public class JbpmHelper implements WorkflowEngineApi {
 		//adminService.mesuraCalcular("jBPM reprendreExpedient", "jbpmDao");
 	}
 
-	/** Actualitza els recursos .class de la definició de procés indicada amb els recursos
-	 * continguts en el jbpmProcessDefinition.
-	 * @param jbpmId Identifica la definició de procés a actualtizar.
-	 * @param jbpmProcessDefinition Conté la informació amb què actualitzar els handlers.
-	 */
-	@Override
-	public void updateHandlers (
-			Long jbpmId, 
-			Map<String, byte[]> handlers) {
-		// Omple que command que substitueix els handlers existents
-		UpdateHandlersCommand command = new UpdateHandlersCommand(
-				jbpmId,
-				handlers);
-		commandService.execute(command);
-	}
-	
 	private Object executeCommandWithAutoSave(
 			Command command,
 			long id,

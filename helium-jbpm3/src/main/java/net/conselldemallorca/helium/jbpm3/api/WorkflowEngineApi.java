@@ -12,8 +12,8 @@ import org.jbpm.graph.exe.Token;
 import org.jbpm.job.Timer;
 import org.jbpm.logging.log.ProcessLog;
 
-import net.conselldemallorca.helium.core.api.Deployment;
-import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessDefinition;
+import net.conselldemallorca.helium.core.api.WDeployment;
+import net.conselldemallorca.helium.core.api.WProcessDefinition;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmProcessInstance;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmTask;
 import net.conselldemallorca.helium.jbpm3.integracio.JbpmToken;
@@ -33,53 +33,48 @@ public interface WorkflowEngineApi {
 	////////////////////////////////////////////////////////////////////////////////
 	
 	// Desplegaments
-	public Deployment desplegar(String nomArxiu, byte[] contingut);
 	
 	/*
+	 * Deployment:
 	 * 
-	 * JbpmProcessDefinition.getId()
-	 * JbpmProcessDefinition.getKey()
-	 * JbpmProcessDefinition.getVersion()
-	 * JbpmProcessDefinition.getProcessDefinition()
-		| V3
-		|
-		| V2.6
-		|- DissenyService
-		|		- deploy		=> 
-	deploy(Long, Long, String, byte[], String, boolean) : DefinicioProces - net.conselldemallorca.helium.core.model.service.DissenyService
-		exportForm(HttpServletRequest, String, MultipartFile, DeployCommand, BindingResult, SessionStatus, ModelMap) : String - net.conselldemallorca.helium.webapp.mvc.DefinicioProcesDeployController
-		exportForm(HttpServletRequest, String, MultipartFile, DeployCommand, BindingResult, SessionStatus, ModelMap) : String - net.conselldemallorca.helium.webapp.mvc.ExpedientTipusDeployController
-		importar(Long, Long, DefinicioProcesExportacio, String) : void - net.conselldemallorca.helium.core.model.service.DissenyService
-			exportForm(HttpServletRequest, String, MultipartFile, DeployCommand, BindingResult, SessionStatus, ModelMap) : String - net.conselldemallorca.helium.webapp.mvc.DefinicioProcesDeployController
-			exportForm(HttpServletRequest, String, MultipartFile, DeployCommand, BindingResult, SessionStatus, ModelMap) : String - net.conselldemallorca.helium.webapp.mvc.ExpedientTipusDeployController
-			importarExpedientTipus(Long, Long, ExpedientTipusExportacio) : void - net.conselldemallorca.helium.core.model.service.DissenyService
-				exportForm(HttpServletRequest, String, MultipartFile, DeployCommand, BindingResult, SessionStatus, ModelMap) : String - net.conselldemallorca.helium.webapp.mvc.DefinicioProcesDeployController
-				importar(HttpServletRequest, String, MultipartFile, Long) : String - net.conselldemallorca.helium.webapp.mvc.ExpedientTipusController
-	importar(Long, Long, DefinicioProcesExportacio, DefinicioProcesExportacioCommandDto, boolean) : DefinicioProces - net.conselldemallorca.helium.core.helper.DefinicioProcesHelper
-		importar(Long, Long, ExpedientTipusExportacioCommandDto, ExpedientTipusExportacio) : ExpedientTipusDto - net.conselldemallorca.helium.v3.core.service.ExpedientTipusServiceImpl
-			importar(Long, Long, ExpedientTipusExportacioCommandDto, ExpedientTipusExportacio) : ExpedientTipusDto - net.conselldemallorca.helium.v3.core.ejb.ExpedientTipusServiceBean
-				importar(Long, Long, ExpedientTipusExportacioCommandDto, ExpedientTipusExportacio) : ExpedientTipusDto - net.conselldemallorca.helium.v3.core.ejb.ExpedientTipusServiceBean
-				importarPost(HttpServletRequest, ExpedientTipusExportarCommand, BindingResult, Model) : String - net.conselldemallorca.helium.webapp.v3.controller.ExpedientTipusController
-			importarPost(HttpServletRequest, ExpedientTipusExportarCommand, BindingResult, Model) : String - net.conselldemallorca.helium.webapp.v3.controller.ExpedientTipusController
-		importar(Long, Long, Long, DefinicioProcesExportacioCommandDto, DefinicioProcesExportacio) : DefinicioProcesDto - net.conselldemallorca.helium.v3.core.service.DefinicioProcesServiceImpl
-			desplegarPost(HttpServletRequest, DefinicioProcesDesplegarCommand, BindingResult, Model) : String - net.conselldemallorca.helium.webapp.v3.controller.DefinicioProcesController
-			importar(Long, Long, Long, DefinicioProcesExportacioCommandDto, DefinicioProcesExportacio) : DefinicioProcesDto - net.conselldemallorca.helium.v3.core.ejb.DefinicioProcesBean
-				desplegarPost(HttpServletRequest, DefinicioProcesDesplegarCommand, BindingResult, Model) : String - net.conselldemallorca.helium.webapp.v3.controller.DefinicioProcesController
-				importar(Long, Long, Long, DefinicioProcesExportacioCommandDto, DefinicioProcesExportacio) : DefinicioProcesDto - net.conselldemallorca.helium.v3.core.ejb.DefinicioProcesBean
-				importarPost(HttpServletRequest, DefinicioProcesExportarCommand, BindingResult, Model) : String - net.conselldemallorca.helium.webapp.v3.controller.DefinicioProcesController
-			importarPost(HttpServletRequest, DefinicioProcesExportarCommand, BindingResult, Model) : String - net.conselldemallorca.helium.webapp.v3.controller.DefinicioProcesController
+	 * getId()
+	 * 		Activiti: deploymentId
+	 * 		Jpmb: processDefinitionId
+	 * getKey()
+	 * getVersion()
+	 * getProcessDefinitions()
+	 * 		A Activiti un desplegament pot incloure diferents definicions de procés, 
+	 * 		així que hem substituit la cridada getProcessDefinition() utilitzada per a 
+	 * 		obtenir les tasques de la definició de procés desplegada, per aquesta, 
+	 * 		que retora una llista
+	 * 
+	 * 		S'han modificat els mètodes de deploy, ja que ara poden generar vàries 
+	 * 		definicions de procés. 
 	 */
-	public void esborrarDesplegament(String jbpmId);
-	public Set<String> getResourceNames(String jbpmId);
-	public byte[] getResourceBytes(String jbpmId, String resourceName);
-	public void updateHandlers(Long jbpmId, Map<String, byte[]> handlers);
+	
+	public WDeployment desplegar(String nomArxiu, byte[] contingut);
+	// Afegim el següent mètode per a compatibilitat amb Activiti, on un desplegament pot 
+	// incloure diverses definicions de procés. 
+	public WDeployment getDesplegament(String deploymentId);
+	
+	public void esborrarDesplegament(String deploymentId);
+	public Set<String> getResourceNames(String deploymentId);
+	public byte[] getResourceBytes(String deploymentId, String resourceName);
+	public void updateHandlers(Long deploymentId, Map<String, byte[]> handlers);
 	
 	// Process Definitions
-	public JbpmProcessDefinition getProcessDefinition(String jbpmId);
-	public List<JbpmProcessDefinition> getSubProcessDefinitions(String jbpmId);
-	public List<String> getTaskNamesFromDeployedProcessDefinition(Deployment dpd);
-	public String getStartTaskName(String jbpmId);
-	public JbpmProcessDefinition findProcessDefinitionWithProcessInstanceId(String processInstanceId);
+	
+	/*
+	 * getProcessDefinition().getName() == getName()
+	 * getVersion()
+	 * getKey()
+	 * getName()
+	 */
+	public WProcessDefinition getProcessDefinition(String deploymentId, String processDefinitionId);
+	public List<WProcessDefinition> getSubProcessDefinitions(String deploymentId, String processDefinitionId);
+	public List<String> getTaskNamesFromDeployedProcessDefinition(WDeployment dpd, String processDefinitionId);
+	public String getStartTaskName(String processDefinitionId);
+	public WProcessDefinition findProcessDefinitionWithProcessInstanceId(String processInstanceId);
 		
 	// DEFINICIÓ DE TASQUES
 	////////////////////////////////////////////////////////////////////////////////
@@ -88,6 +83,15 @@ public interface WorkflowEngineApi {
 	// INSTÀNCIA DE PROCÉS
 	////////////////////////////////////////////////////////////////////////////////
 	
+	/*
+	 * getId()
+	 * getProcessDefinitionId()
+	 * getProcessInstance().getProcessDefinition().getName() ==> Activiti::ProcessInstance.getProcessDefinitionName()
+	 * getParentProcessInstanceId()
+	 * getProcessInstance().getId()
+	 * getEnd() ==> Activiti::HistoricProcessInstance.getEndTime()
+	 * getProcessInstance().getTaskMgmtInstance().getUnfinishedTasks(currentToken) ==> Retroces!!!
+	 */
 	public List<JbpmProcessInstance> findProcessInstancesWithProcessDefinitionId(String processDefinitionId);
 	public List<JbpmProcessInstance> findProcessInstancesWithProcessDefinitionNameAndEntorn(String processName, Long entornId);
 	public List<JbpmProcessInstance> getProcessInstanceTree(String rootProcessInstanceId);
